@@ -2,6 +2,9 @@ name: Scheduled Macro
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
   schedule:
     # 10:00, 12:00, 14:00, 15:00 KST, Monday-Friday.
     # GitHub cron is UTC, so this is 01:00, 03:00, 05:00, 06:00 UTC.

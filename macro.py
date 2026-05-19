@@ -1194,37 +1194,21 @@ def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=
             ", ".join(top20["Name"].head(10).astype(str).tolist())
         ])
 
-        top_themes = top20["Theme"].value_counts().head(5).to_dict()
-        rows.append([
-            "Top_Themes",
-            " | ".join([f"{k}:{v}" for k, v in top_themes.items()])
-        ])
-
-    # 테마 순위 변동 설명 추가
-    if theme_rotation_df is not None and not theme_rotation_df.empty:
-        temp = theme_rotation_df.copy()
-
-        if "RankChange" in temp.columns:
-            temp["RankMove_Text"] = temp["RankChange"].apply(make_rank_change_text)
-
-        top_rotation = temp.head(5)
-
-        move_text = []
-        for _, row in top_rotation.iterrows():
-            theme = row.get("Theme", "")
-            today_rank = row.get("TodayRank", "")
-            prev_rank = row.get("PrevRank", "")
-            move = row.get("RankMove_Text", "")
-            signal = row.get("RotationSignal", "")
-
-            move_text.append(
-                f"{theme}: {prev_rank}위 → {today_rank}위 / {move} / {signal}"
+    if buy_df is not None and not buy_df.empty:
+        portfolio_candidates = []
+        for _, row in buy_df.head(8).iterrows():
+            portfolio_candidates.append(
+                f"{row.get('Name', '')}({row.get('Theme', '')}, RS20 {row.get('RS20', 0):.2f}, {row.get('BuyReason', '')})"
             )
+        rows.append(["Portfolio_Candidates", " | ".join(portfolio_candidates)])
 
-        rows.append([
-            "Theme_Rank_Change_Top5",
-            " | ".join(move_text)
-        ])
+    if sell_df is not None and not sell_df.empty:
+        replacement_candidates = []
+        for _, row in sell_df.head(8).iterrows():
+            replacement_candidates.append(
+                f"{row.get('Name', '')}({row.get('Theme', '')}, RS20 {row.get('RS20', 0):.2f}, {row.get('SellReason', '')})"
+            )
+        rows.append(["Portfolio_Replacement", " | ".join(replacement_candidates)])
 
     # 포지션 변동 예시
     rows.append([
@@ -1320,8 +1304,8 @@ def format_signal_message(signal_df):
         "Buy_Count",
         "Sell_Count",
         "Top10_Names",
-        "Top_Themes",
-        "Theme_Rank_Change_Top5",
+        "Portfolio_Candidates",
+        "Portfolio_Replacement",
         "Current_Position_Comment",
     ]
 
@@ -1339,8 +1323,8 @@ def format_signal_message(signal_df):
         "Buy_Count": "매수후보 수",
         "Sell_Count": "매도후보 수",
         "Top10_Names": "상위 종목",
-        "Top_Themes": "상위 테마",
-        "Theme_Rank_Change_Top5": "테마 변화",
+        "Portfolio_Candidates": "포트폴리오 후보",
+        "Portfolio_Replacement": "포트폴리오 교체",
         "Current_Position_Comment": "현재 해석",
     }
 
@@ -1398,111 +1382,241 @@ def draw_wrapped_text(draw, xy, text, font, fill, max_width, line_gap=8):
         y += font.size + line_gap
     return y
 
+def split_list_value(value):
+    if not value or value == "-":
+        return []
+    return [item.strip() for item in str(value).split(",") if item.strip()]
+
+def split_pipe_value(value):
+    if not value or value == "-":
+        return []
+    return [item.strip() for item in str(value).split("|") if item.strip()]
+
+def parse_theme_counts(value):
+    items = []
+    if not value or value == "-":
+        return items
+    for part in str(value).split("|"):
+        if ":" not in part:
+            continue
+        name, count = part.split(":", 1)
+        try:
+            count_num = int(float(count.strip()))
+        except Exception:
+            count_num = 0
+        items.append((name.strip(), count_num))
+    return items
+
+def draw_card(draw, box, radius=26, fill="white", outline="#dbe3ef", width=2):
+    draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
+
+def draw_kv_row(draw, x, y, label, value, label_font, value_font, label_fill, value_fill, max_width):
+    draw.text((x, y), label, font=label_font, fill=label_fill)
+    return draw_wrapped_text(draw, (x + 152, y), value, value_font, value_fill, max_width - 152)
+
+def draw_position_scale(draw, x, y, width, current_level, font, bold_font):
+    levels = ["최상위 공격", "공격 유지", "중립 전환 준비", "중립", "방어", "강한 방어", "최하위 방어", "현금 최우선"]
+    gap = 8
+    pill_h = 50
+    cur_x = x
+    for idx, level in enumerate(levels):
+        pill_w = int(draw.textlength(level, font=bold_font if level == current_level else font)) + 26
+        if cur_x + pill_w > x + width:
+            cur_x = x
+            y += pill_h + 10
+        is_current = level == current_level
+        fill = "#dc2626" if is_current else "#eef2f7"
+        outline = "#dc2626" if is_current else "#d6dee9"
+        text_fill = "white" if is_current else "#475569"
+        use_font = bold_font if is_current else font
+        draw.rounded_rectangle((cur_x, y, cur_x + pill_w, y + pill_h), radius=20, fill=fill, outline=outline, width=2)
+        draw.text((cur_x + 13, y + 10), level, font=use_font, fill=text_fill)
+        cur_x += pill_w + gap
+    return y + pill_h
+
+def draw_stock_chips(draw, x, y, width, stocks, font, small_font):
+    chip_gap = 10
+    chip_h = 46
+    cur_x = x
+    for idx, stock in enumerate(stocks, start=1):
+        label = f"{idx}. {stock}"
+        chip_w = int(draw.textlength(label, font=font)) + 24
+        if chip_w > width:
+            chip_w = width
+        if cur_x + chip_w > x + width:
+            cur_x = x
+            y += chip_h + 10
+        fill = "#eff6ff" if idx <= 5 else "#f8fafc"
+        outline = "#bfdbfe" if idx <= 5 else "#e2e8f0"
+        draw.rounded_rectangle((cur_x, y, cur_x + chip_w, y + chip_h), radius=19, fill=fill, outline=outline, width=1)
+        draw.text((cur_x + 12, y + 10), label, font=font if idx <= 5 else small_font, fill="#1e3a8a")
+        cur_x += chip_w + chip_gap
+    return y + chip_h
+
+def draw_theme_bars(draw, x, y, width, themes, font, bold_font):
+    if not themes:
+        draw.text((x, y), "-", font=font, fill="#64748b")
+        return y + 32
+    max_count = max(count for _, count in themes) or 1
+    label_w = 150
+    bar_w = width - label_w - 58
+    for name, count in themes:
+        draw.text((x, y + 4), name, font=bold_font, fill="#0f172a")
+        draw.rounded_rectangle((x + label_w, y + 9, x + label_w + bar_w, y + 33), radius=12, fill="#e5e7eb")
+        fill_w = int(bar_w * count / max_count)
+        draw.rounded_rectangle((x + label_w, y + 9, x + label_w + fill_w, y + 33), radius=12, fill="#2563eb")
+        draw.text((x + label_w + bar_w + 16, y + 3), str(count), font=bold_font, fill="#172554")
+        y += 50
+    return y
+
+def draw_numbered_list(draw, x, y, width, items, font, number_font, number_fill="#2563eb", text_fill="#334155", limit=8):
+    if not items:
+        draw.text((x, y), "-", font=font, fill=text_fill)
+        return y + font.size + 8
+    for idx, item in enumerate(items[:limit], start=1):
+        circle = 34
+        draw.ellipse((x, y, x + circle, y + circle), fill="#eff6ff", outline="#bfdbfe", width=1)
+        num = str(idx)
+        tw = draw.textlength(num, font=number_font)
+        draw.text((x + (circle - tw) / 2, y + 5), num, font=number_font, fill=number_fill)
+        y = draw_wrapped_text(draw, (x + 48, y + 2), item, font, text_fill, width - 48, line_gap=6) + 10
+    return y
+
 def make_signal_image(signal_df):
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     values = {k: clean_signal_value(v) for k, v in get_signal_values(signal_df).items()}
 
     width = 1200
-    margin = 52
-    card_gap = 24
-    bg = "#f3f6fb"
+    height = 1880
+    margin = 56
+    bg = "#f4f7fb"
     navy = "#172554"
     blue = "#2563eb"
     red = "#dc2626"
-    green = "#16a34a"
     text = "#111827"
     muted = "#4b5563"
     line = "#dbe3ef"
+    gold = "#c8a24a"
 
-    title_font = load_font(48, bold=True)
-    subtitle_font = load_font(24)
-    label_font = load_font(24, bold=True)
-    body_font = load_font(25)
-    small_font = load_font(21)
-    badge_font = load_font(30, bold=True)
-
-    sections = [
-        ("시장 상태", [
-            ("시장모드", values.get("Mode", "-")),
-            ("위험신호 수", values.get("Signal_Count", "-")),
-            ("위험신호", values.get("Signals", "-")),
-        ]),
-        ("포지션 가이드", [
-            ("단계", values.get("Position_Level", "-")),
-            ("주식비중", values.get("Recommended_Stock_Position", "-")),
-            ("현금비중", values.get("Recommended_Cash_Position", "-")),
-            ("대응", values.get("Action_Guide", "-")),
-            ("리스크", values.get("Risk_Guide", "-")),
-        ]),
-        ("시장 후보", [
-            ("TOP20", values.get("Top20_Count", "-")),
-            ("매수후보", values.get("Buy_Count", "-")),
-            ("매도후보", values.get("Sell_Count", "-")),
-            ("상위 종목", values.get("Top10_Names", "-")),
-            ("상위 테마", values.get("Top_Themes", "-")),
-            ("테마 변화", values.get("Theme_Rank_Change_Top5", "-")),
-        ]),
-        ("현재 해석", [
-            ("요약", values.get("Current_Position_Comment", "-")),
-        ]),
-    ]
-
-    probe = Image.new("RGB", (width, 10), bg)
-    draw = ImageDraw.Draw(probe)
-    content_width = width - margin * 2
-    heights = [150]
-    for _, rows in sections:
-        h = 76
-        for label, value in rows:
-            label_w = 150
-            wrapped = wrap_text(draw, value, body_font, content_width - label_w - 44)
-            h += max(42, len(wrapped) * (body_font.size + 8)) + 8
-        heights.append(h)
-    height = sum(heights) + card_gap * len(sections) + margin
+    title_font = load_font(60, bold=True)
+    subtitle_font = load_font(28)
+    label_font = load_font(28, bold=True)
+    body_font = load_font(28)
+    small_font = load_font(24)
+    chip_font = load_font(24, bold=True)
+    badge_font = load_font(34, bold=True)
+    section_font = load_font(34, bold=True)
+    metric_font = load_font(42, bold=True)
 
     img = Image.new("RGB", (width, height), bg)
     draw = ImageDraw.Draw(img)
+    content_w = width - margin * 2
+
+    # subtle research-report grid
+    for gx in range(0, width, 48):
+        draw.line((gx, 0, gx, height), fill="#edf2f7", width=1)
+    for gy in range(0, height, 48):
+        draw.line((0, gy, width, gy), fill="#edf2f7", width=1)
 
     y = 42
     draw.text((margin, y), "Korea RS SIGNAL", font=title_font, fill=navy)
-    y += 58
-    draw.text((margin, y), values.get("Timestamp", NOW_STR), font=subtitle_font, fill=muted)
-
+    draw.rectangle((margin, y + 76, margin + 560, y + 82), fill=gold)
+    y += 94
+    draw.text((margin, y), f"{values.get('Timestamp', NOW_STR)} | 국내 매크로/RS 리스크 점검", font=subtitle_font, fill=muted)
     mode = values.get("Mode", "-")
-    badge_fill = red if "CRASH" in mode else green if "NORMAL" in mode else "#f59e0b"
+    badge_fill = red if "CRASH" in mode else "#16a34a" if "NORMAL" in mode else "#f59e0b"
     badge_text = mode
     badge_w = int(draw.textlength(badge_text, font=badge_font)) + 38
-    draw.rounded_rectangle((width - margin - badge_w, 48, width - margin, 98), radius=24, fill=badge_fill)
-    draw.text((width - margin - badge_w + 19, 56), badge_text, font=badge_font, fill="white")
-    y += 70
+    draw.rounded_rectangle((width - margin - badge_w, 50, width - margin, 108), radius=28, fill=badge_fill)
+    draw.text((width - margin - badge_w + 19, 60), badge_text, font=badge_font, fill="white")
+    y += 82
 
-    for title, rows in sections:
-        card_top = y
-        x0, x1 = margin, width - margin
-        draw.rounded_rectangle((x0, card_top, x1, card_top + 10), radius=18, fill="white")
-        section_y = card_top + 24
-        draw.text((x0 + 28, section_y), title, font=label_font, fill=blue)
-        section_y += 48
-        draw.line((x0 + 28, section_y, x1 - 28, section_y), fill=line, width=2)
-        section_y += 22
+    # hero metrics
+    x = margin
+    metric_w = (content_w - 24 * 2) // 3
+    metrics = [
+        ("포지션 단계", values.get("Position_Level", "-"), red),
+        ("주식 비중", values.get("Recommended_Stock_Position", "-"), navy),
+        ("현금 비중", values.get("Recommended_Cash_Position", "-"), navy),
+    ]
+    for idx, (label, value, color) in enumerate(metrics):
+        x0 = x + idx * (metric_w + 24)
+        draw_card(draw, (x0, y, x0 + metric_w, y + 152), fill="white", outline=line)
+        draw.text((x0 + 24, y + 24), label, font=label_font, fill=muted)
+        draw.text((x0 + 24, y + 72), value, font=metric_font, fill=color)
+    y += 178
 
-        for label, value in rows:
-            draw.text((x0 + 28, section_y), label, font=label_font, fill=text)
-            value_x = x0 + 178
-            section_y = draw_wrapped_text(
-                draw,
-                (value_x, section_y),
-                value,
-                body_font if label not in {"상위 종목", "상위 테마", "테마 변화", "위험신호"} else small_font,
-                muted,
-                x1 - value_x - 30,
-                line_gap=8,
-            )
-            section_y += 14
+    # position scale
+    draw_card(draw, (margin, y, width - margin, y + 170), fill="white", outline=line)
+    draw.text((margin + 30, y + 24), "포지션 단계 흐름", font=section_font, fill=navy)
+    draw_position_scale(draw, margin + 30, y + 88, content_w - 60, values.get("Position_Level", "-"), small_font, load_font(24, bold=True))
+    y += 194
 
-        card_bottom = section_y + 18
-        draw.rounded_rectangle((x0, card_top, x1, card_bottom), radius=22, outline=line, width=2)
-        y = card_bottom + card_gap
+    # risk and action
+    draw_card(draw, (margin, y, width - margin, y + 252), fill="#fff7ed", outline="#fed7aa")
+    draw.text((margin + 30, y + 28), "핵심 리스크 / 대응", font=section_font, fill="#9a3412")
+    sy = y + 86
+    sy = draw_kv_row(draw, margin + 28, sy, "위험신호", values.get("Signals", "-"), label_font, small_font, "#7c2d12", "#431407", content_w - 56)
+    sy += 18
+    sy = draw_kv_row(draw, margin + 28, sy, "대응", values.get("Action_Guide", "-"), label_font, body_font, "#7c2d12", "#431407", content_w - 56)
+    y += 278
+
+    # counts
+    draw_card(draw, (margin, y, width - margin, y + 130), fill="white", outline=line)
+    counts = [("TOP20", "Top20_Count"), ("매수후보", "Buy_Count"), ("매도후보", "Sell_Count"), ("위험신호", "Signal_Count")]
+    for idx, (label, key) in enumerate(counts):
+        cx = margin + 36 + idx * 260
+        draw.text((cx, y + 26), label, font=label_font, fill=muted)
+        draw.text((cx, y + 68), values.get(key, "-"), font=metric_font, fill=red if key in {"Sell_Count", "Signal_Count"} else navy)
+    y += 154
+
+    # stocks
+    stocks = split_list_value(values.get("Top10_Names", ""))
+    draw_card(draw, (margin, y, width - margin, y + 270), fill="white", outline=line)
+    draw.text((margin + 30, y + 28), "상위 종목 Top 10", font=section_font, fill=navy)
+    draw_stock_chips(draw, margin + 30, y + 94, content_w - 60, stocks, chip_font, load_font(22))
+    y += 296
+
+    # portfolio and replacement
+    portfolio_items = split_pipe_value(values.get("Portfolio_Candidates", ""))
+    replacement_items = split_pipe_value(values.get("Portfolio_Replacement", ""))
+    left_w = (content_w - 24) // 2
+    draw_card(draw, (margin, y, margin + left_w, y + 390), fill="white", outline=line)
+    draw.text((margin + 30, y + 28), "포트폴리오 후보", font=section_font, fill=navy)
+    draw_numbered_list(
+        draw,
+        margin + 30,
+        y + 96,
+        left_w - 60,
+        portfolio_items,
+        load_font(21),
+        load_font(19, bold=True),
+        number_fill="#2563eb",
+        text_fill="#334155",
+        limit=5,
+    )
+
+    right_x = margin + left_w + 24
+    draw_card(draw, (right_x, y, width - margin, y + 390), fill="#fff7f7", outline="#fecaca")
+    draw.text((right_x + 30, y + 28), "포트폴리오 교체", font=section_font, fill=red)
+    draw_numbered_list(
+        draw,
+        right_x + 30,
+        y + 96,
+        left_w - 60,
+        replacement_items,
+        load_font(21),
+        load_font(19, bold=True),
+        number_fill=red,
+        text_fill="#7f1d1d",
+        limit=5,
+    )
+    y += 416
+
+    # analyst note
+    draw_card(draw, (margin, y, width - margin, y + 178), fill="#f8fafc", outline=line)
+    draw.text((margin + 30, y + 28), "현재 해석", font=section_font, fill=navy)
+    draw_wrapped_text(draw, (margin + 30, y + 88), values.get("Current_Position_Comment", "-"), body_font, text, content_w - 60)
 
     path = RESULTS_DIR / f"signal_{TODAY}.png"
     img.save(path)
