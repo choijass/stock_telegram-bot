@@ -43,6 +43,7 @@ GSHEET_NAME = "Korea_RS_Live_System_Final_Stable"
 RESULTS_DIR = Path(os.getenv("RESULTS_DIR", "results"))
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_REQUIRED = os.getenv("TELEGRAM_REQUIRED", "false").lower() in {"1", "true", "yes", "y"}
 
 DOWNLOAD_PERIOD = "9mo"
 DOWNLOAD_INTERVAL = "1d"
@@ -1349,11 +1350,16 @@ def format_signal_message(signal_df):
 
 def send_telegram_message(message):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("[INFO] Telegram secret 없음: 발송 생략")
+        note = "[INFO] Telegram secret 없음: 발송 생략"
+        if TELEGRAM_REQUIRED:
+            raise RuntimeError(note)
+        print(note)
         return
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     chunks = [message[i:i + 3900] for i in range(0, len(message), 3900)]
+    masked_chat_id = TELEGRAM_CHAT_ID[:4] + "..." + TELEGRAM_CHAT_ID[-4:] if len(TELEGRAM_CHAT_ID) > 8 else "***"
+    print(f"[INFO] Telegram 발송 대상 chat_id: {masked_chat_id}")
 
     for chunk in chunks:
         data = urlencode({

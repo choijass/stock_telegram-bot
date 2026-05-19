@@ -2,6 +2,9 @@ name: Scheduled Macro
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
   schedule:
     # 10:00, 12:00, 14:00, 15:00 KST, Monday-Friday.
     # GitHub cron is UTC, so this is 01:00, 03:00, 05:00, 06:00 UTC.
@@ -33,6 +36,7 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_REQUIRED: "true"
           USE_GOOGLE_SHEETS: "true"
           RESULTS_DIR: "results"
         run: python macro.py
