@@ -1,0 +1,8 @@
+__pycache__/
+.pycache_tmp/
+*.pyc
+.venv/
+.DS_Store
+.env
+google-service-account.json
+results_test/
