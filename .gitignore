@@ -6,3 +6,4 @@ __pycache__/
 .env
 google-service-account.json
 results_test/
+results_signal_test/

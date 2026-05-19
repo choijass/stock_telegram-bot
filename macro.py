@@ -21,6 +21,8 @@ import time
 import warnings
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -39,6 +41,8 @@ NOW_STR = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
 USE_GOOGLE_SHEETS = os.getenv("USE_GOOGLE_SHEETS", "true").lower() in {"1", "true", "yes", "y"}
 GSHEET_NAME = "Korea_RS_Live_System_Final_Stable"
 RESULTS_DIR = Path(os.getenv("RESULTS_DIR", "results"))
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 DOWNLOAD_PERIOD = "9mo"
 DOWNLOAD_INTERVAL = "1d"
@@ -1294,6 +1298,74 @@ def save_csv(df, filename):
         df.to_csv(path, index=False, encoding="utf-8-sig")
     print(f"[OK] CSV 저장: {path}")
 
+def format_signal_message(signal_df):
+    if signal_df is None or signal_df.empty:
+        return f"[Korea RS SIGNAL]\n{NOW_STR}\nSIGNAL 데이터가 없습니다."
+
+    values = dict(zip(signal_df["Item"].astype(str), signal_df["Value"].astype(str)))
+    ordered_items = [
+        "Timestamp",
+        "Mode",
+        "Signal_Count",
+        "Signals",
+        "Position_Level",
+        "Recommended_Stock_Position",
+        "Recommended_Cash_Position",
+        "Action_Guide",
+        "Risk_Guide",
+        "Top20_Count",
+        "Buy_Count",
+        "Sell_Count",
+        "Top10_Names",
+        "Top_Themes",
+        "Theme_Rank_Change_Top5",
+        "Current_Position_Comment",
+    ]
+
+    labels = {
+        "Timestamp": "시간",
+        "Mode": "시장모드",
+        "Signal_Count": "위험신호 수",
+        "Signals": "위험신호",
+        "Position_Level": "포지션 단계",
+        "Recommended_Stock_Position": "권장 주식비중",
+        "Recommended_Cash_Position": "권장 현금비중",
+        "Action_Guide": "대응",
+        "Risk_Guide": "리스크",
+        "Top20_Count": "TOP20 수",
+        "Buy_Count": "매수후보 수",
+        "Sell_Count": "매도후보 수",
+        "Top10_Names": "상위 종목",
+        "Top_Themes": "상위 테마",
+        "Theme_Rank_Change_Top5": "테마 변화",
+        "Current_Position_Comment": "현재 해석",
+    }
+
+    lines = ["[Korea RS SIGNAL]"]
+    for item in ordered_items:
+        if item in values:
+            lines.append(f"{labels.get(item, item)}: {values[item]}")
+    return "\n".join(lines)
+
+def send_telegram_message(message):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("[INFO] Telegram secret 없음: 발송 생략")
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    chunks = [message[i:i + 3900] for i in range(0, len(message), 3900)]
+
+    for chunk in chunks:
+        data = urlencode({
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": chunk,
+            "disable_web_page_preview": "true",
+        }).encode("utf-8")
+        req = Request(url, data=data, method="POST")
+        with urlopen(req, timeout=30) as response:
+            response.read()
+    print("[OK] Telegram SIGNAL 발송 완료")
+
 # ---------------------------------------------------------
 # 20) 메인
 # ---------------------------------------------------------
@@ -1342,9 +1414,7 @@ def main():
     theme_flow_df = build_theme_flow(all_rank, turnover_surge_df)
     print("[DEBUG] theme_flow_df columns:", list(theme_flow_df.columns))
 
-    print("\n[10] BENCHMARK / RULES 생성")
-    bench_df = build_benchmark_table(bench_map)
-    rules_df = build_rules_table(mode, len(signals))
+    print("\n[10] SIGNAL 보조 데이터 생성")
 
     print("\n[11] Google Sheets 연결")
     gc = init_gspread()
@@ -1365,68 +1435,17 @@ def main():
         theme_rotation_df
     )
 
-    print("\n================ MODE ================")
-    print(mode)
-    print("Signals:", signals if signals else "None")
+    print("\n================ SIGNAL ================")
+    print(signal_df.to_string(index=False))
 
-    print("\n================ TOP20 ================")
-    print(safe_subset(top20, [
-        "TopRank", "Name", "Ticker", "Theme",
-        "1D%", "20D%", "60D%", "RS20", "RS60", "Score"
-    ]).to_string(index=False))
-
-    print("\n================ BUY_CANDIDATE ================")
-    print(safe_subset(buy_df, [
-        "BuyRank", "Name", "Theme", "1D%", "20D%", "RS20", "RS60",
-        "TurnoverBurst", "Score", "BuyReason"
-    ]).to_string(index=False))
-
-    print("\n================ SELL_CANDIDATE ================")
-    print(safe_subset(sell_df, [
-        "SellRank", "Name", "Theme", "1D%", "20D%", "RS20", "RS60",
-        "TurnoverBurst", "Score", "SellReason"
-    ]).to_string(index=False))
-
-    print("\n================ TURNOVER_SURGE ================")
-    print(safe_subset(turnover_surge_df, [
-        "SurgeRank", "Name", "Theme", "1D%", "5D%", "20D%",
-        "TurnoverRatio5", "TurnoverRatio20", "RS20", "RS60",
-        "SurgeScore", "SurgeReason"
-    ]).to_string(index=False))
-
-    print("\n================ THEME_FLOW ================")
-    print(theme_flow_df.to_string(index=False))
-
-    print("\n================ THEME_ROTATION ================")
-    print(theme_rotation_df.to_string(index=False))
-
-    print("\n[14] CSV 저장")
-    save_csv(top20, f"top20_{TODAY}.csv")
-    save_csv(all_rank, f"all_rank_{TODAY}.csv")
-    save_csv(bench_df, f"benchmark_{TODAY}.csv")
+    print("\n[14] SIGNAL CSV 저장")
     save_csv(signal_df, f"signal_{TODAY}.csv")
-    save_csv(buy_df, f"buy_candidates_{TODAY}.csv")
-    save_csv(sell_df, f"sell_candidates_{TODAY}.csv")
-    save_csv(theme_df, f"theme_rank_{TODAY}.csv")
-    save_csv(rules_df, f"rules_{TODAY}.csv")
-    save_csv(turnover_surge_df, f"turnover_surge_{TODAY}.csv")
-    save_csv(theme_flow_df, f"theme_flow_{TODAY}.csv")
-    save_csv(theme_rotation_df, f"theme_rotation_{TODAY}.csv")
 
-    print("\n[15] Google Sheets 저장")
-    write_df_to_gsheet(gc, GSHEET_NAME, "TOP20", top20)
-    write_df_to_gsheet(gc, GSHEET_NAME, "ALL_RANK", all_rank)
-    write_df_to_gsheet(gc, GSHEET_NAME, "BENCHMARK", bench_df)
+    print("\n[15] Google Sheets SIGNAL 저장")
     write_df_to_gsheet(gc, GSHEET_NAME, "SIGNAL", signal_df)
-    write_df_to_gsheet(gc, GSHEET_NAME, "BUY_CANDIDATE", buy_df)
-    write_df_to_gsheet(gc, GSHEET_NAME, "SELL_CANDIDATE", sell_df)
-    write_df_to_gsheet(gc, GSHEET_NAME, "THEME_RANK", theme_df)
-    write_df_to_gsheet(gc, GSHEET_NAME, "RULES", rules_df)
-    write_df_to_gsheet(gc, GSHEET_NAME, "TURNOVER_SURGE", turnover_surge_df)
-    write_df_to_gsheet(gc, GSHEET_NAME, "THEME_FLOW", theme_flow_df)
-    write_df_to_gsheet(gc, GSHEET_NAME, "THEME_ROTATION", theme_rotation_df)
 
-    append_df_to_gsheet(gc, GSHEET_NAME, "THEME_FLOW_HISTORY", theme_flow_df)
+    print("\n[16] Telegram SIGNAL 발송")
+    send_telegram_message(format_signal_message(signal_df))
 
     print("\n" + "=" * 70)
     print("DONE")

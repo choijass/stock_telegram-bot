@@ -3,11 +3,12 @@ name: Scheduled Macro
 on:
   workflow_dispatch:
   schedule:
-    # 08:30 KST, Monday-Friday. GitHub cron is UTC.
-    - cron: "30 23 * * 0-4"
+    # 10:00, 12:00, 14:00, 15:00 KST, Monday-Friday.
+    # GitHub cron is UTC, so this is 01:00, 03:00, 05:00, 06:00 UTC.
+    - cron: "0 1,3,5,6 * * 1-5"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   run-macro:
@@ -30,21 +31,15 @@ jobs:
       - name: Run macro
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           USE_GOOGLE_SHEETS: "true"
           RESULTS_DIR: "results"
         run: python macro.py
 
-      - name: Upload CSV artifacts
+      - name: Upload SIGNAL CSV artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macro-results
-          path: results/*.csv
+          name: signal-result
+          path: results/signal_*.csv
           if-no-files-found: warn
-
-      - name: Commit result CSVs
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add results/*.csv
-          git diff --staged --quiet || git commit -m "Update scheduled macro results"
-          git push
