@@ -28,6 +28,8 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import requests
+from PIL import Image, ImageDraw, ImageFont
 
 warnings.filterwarnings("ignore")
 
@@ -1348,6 +1350,165 @@ def format_signal_message(signal_df):
             lines.append(f"{labels.get(item, item)}: {values[item]}")
     return "\n".join(lines)
 
+def get_signal_values(signal_df):
+    if signal_df is None or signal_df.empty:
+        return {}
+    return dict(zip(signal_df["Item"].astype(str), signal_df["Value"].astype(str)))
+
+def clean_signal_value(value):
+    text = str(value)
+    return text.replace("nan위 →", "신규 →").replace("nan", "-")
+
+def load_font(size, bold=False):
+    candidates = [
+        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf" if bold else "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf" if bold else "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+        "/Library/Fonts/AppleGothic.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    ]
+    for path in candidates:
+        if path and Path(path).exists():
+            try:
+                return ImageFont.truetype(path, size=size)
+            except Exception:
+                pass
+    return ImageFont.load_default()
+
+def wrap_text(draw, text, font, max_width):
+    words = str(text).replace(" | ", "  |  ").split()
+    lines = []
+    line = ""
+    for word in words:
+        candidate = word if not line else f"{line} {word}"
+        if draw.textlength(candidate, font=font) <= max_width:
+            line = candidate
+        else:
+            if line:
+                lines.append(line)
+            line = word
+    if line:
+        lines.append(line)
+    return lines or [""]
+
+def draw_wrapped_text(draw, xy, text, font, fill, max_width, line_gap=8):
+    x, y = xy
+    for line in wrap_text(draw, text, font, max_width):
+        draw.text((x, y), line, font=font, fill=fill)
+        y += font.size + line_gap
+    return y
+
+def make_signal_image(signal_df):
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    values = {k: clean_signal_value(v) for k, v in get_signal_values(signal_df).items()}
+
+    width = 1200
+    margin = 52
+    card_gap = 24
+    bg = "#f3f6fb"
+    navy = "#172554"
+    blue = "#2563eb"
+    red = "#dc2626"
+    green = "#16a34a"
+    text = "#111827"
+    muted = "#4b5563"
+    line = "#dbe3ef"
+
+    title_font = load_font(48, bold=True)
+    subtitle_font = load_font(24)
+    label_font = load_font(24, bold=True)
+    body_font = load_font(25)
+    small_font = load_font(21)
+    badge_font = load_font(30, bold=True)
+
+    sections = [
+        ("시장 상태", [
+            ("시장모드", values.get("Mode", "-")),
+            ("위험신호 수", values.get("Signal_Count", "-")),
+            ("위험신호", values.get("Signals", "-")),
+        ]),
+        ("포지션 가이드", [
+            ("단계", values.get("Position_Level", "-")),
+            ("주식비중", values.get("Recommended_Stock_Position", "-")),
+            ("현금비중", values.get("Recommended_Cash_Position", "-")),
+            ("대응", values.get("Action_Guide", "-")),
+            ("리스크", values.get("Risk_Guide", "-")),
+        ]),
+        ("시장 후보", [
+            ("TOP20", values.get("Top20_Count", "-")),
+            ("매수후보", values.get("Buy_Count", "-")),
+            ("매도후보", values.get("Sell_Count", "-")),
+            ("상위 종목", values.get("Top10_Names", "-")),
+            ("상위 테마", values.get("Top_Themes", "-")),
+            ("테마 변화", values.get("Theme_Rank_Change_Top5", "-")),
+        ]),
+        ("현재 해석", [
+            ("요약", values.get("Current_Position_Comment", "-")),
+        ]),
+    ]
+
+    probe = Image.new("RGB", (width, 10), bg)
+    draw = ImageDraw.Draw(probe)
+    content_width = width - margin * 2
+    heights = [150]
+    for _, rows in sections:
+        h = 76
+        for label, value in rows:
+            label_w = 150
+            wrapped = wrap_text(draw, value, body_font, content_width - label_w - 44)
+            h += max(42, len(wrapped) * (body_font.size + 8)) + 8
+        heights.append(h)
+    height = sum(heights) + card_gap * len(sections) + margin
+
+    img = Image.new("RGB", (width, height), bg)
+    draw = ImageDraw.Draw(img)
+
+    y = 42
+    draw.text((margin, y), "Korea RS SIGNAL", font=title_font, fill=navy)
+    y += 58
+    draw.text((margin, y), values.get("Timestamp", NOW_STR), font=subtitle_font, fill=muted)
+
+    mode = values.get("Mode", "-")
+    badge_fill = red if "CRASH" in mode else green if "NORMAL" in mode else "#f59e0b"
+    badge_text = mode
+    badge_w = int(draw.textlength(badge_text, font=badge_font)) + 38
+    draw.rounded_rectangle((width - margin - badge_w, 48, width - margin, 98), radius=24, fill=badge_fill)
+    draw.text((width - margin - badge_w + 19, 56), badge_text, font=badge_font, fill="white")
+    y += 70
+
+    for title, rows in sections:
+        card_top = y
+        x0, x1 = margin, width - margin
+        draw.rounded_rectangle((x0, card_top, x1, card_top + 10), radius=18, fill="white")
+        section_y = card_top + 24
+        draw.text((x0 + 28, section_y), title, font=label_font, fill=blue)
+        section_y += 48
+        draw.line((x0 + 28, section_y, x1 - 28, section_y), fill=line, width=2)
+        section_y += 22
+
+        for label, value in rows:
+            draw.text((x0 + 28, section_y), label, font=label_font, fill=text)
+            value_x = x0 + 178
+            section_y = draw_wrapped_text(
+                draw,
+                (value_x, section_y),
+                value,
+                body_font if label not in {"상위 종목", "상위 테마", "테마 변화", "위험신호"} else small_font,
+                muted,
+                x1 - value_x - 30,
+                line_gap=8,
+            )
+            section_y += 14
+
+        card_bottom = section_y + 18
+        draw.rounded_rectangle((x0, card_top, x1, card_bottom), radius=22, outline=line, width=2)
+        y = card_bottom + card_gap
+
+    path = RESULTS_DIR / f"signal_{TODAY}.png"
+    img.save(path)
+    print(f"[OK] SIGNAL 이미지 저장: {path}")
+    return path
+
 def send_telegram_message(message):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         note = "[INFO] Telegram secret 없음: 발송 생략"
@@ -1371,6 +1532,31 @@ def send_telegram_message(message):
         with urlopen(req, timeout=30) as response:
             response.read()
     print("[OK] Telegram SIGNAL 발송 완료")
+
+def send_telegram_photo(image_path, caption):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        note = "[INFO] Telegram secret 없음: 이미지 발송 생략"
+        if TELEGRAM_REQUIRED:
+            raise RuntimeError(note)
+        print(note)
+        return
+
+    masked_chat_id = TELEGRAM_CHAT_ID[:4] + "..." + TELEGRAM_CHAT_ID[-4:] if len(TELEGRAM_CHAT_ID) > 8 else "***"
+    print(f"[INFO] Telegram 이미지 발송 대상 chat_id: {masked_chat_id}")
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+    with open(image_path, "rb") as image_file:
+        response = requests.post(
+            url,
+            data={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "caption": caption[:1024],
+            },
+            files={"photo": image_file},
+            timeout=60,
+        )
+    if not response.ok:
+        raise RuntimeError(f"Telegram 이미지 발송 실패: {response.status_code} {response.text}")
+    print("[OK] Telegram SIGNAL 이미지 발송 완료")
 
 # ---------------------------------------------------------
 # 20) 메인
@@ -1446,12 +1632,13 @@ def main():
 
     print("\n[14] SIGNAL CSV 저장")
     save_csv(signal_df, f"signal_{TODAY}.csv")
+    image_path = make_signal_image(signal_df)
 
     print("\n[15] Google Sheets SIGNAL 저장")
     write_df_to_gsheet(gc, GSHEET_NAME, "SIGNAL", signal_df)
 
     print("\n[16] Telegram SIGNAL 발송")
-    send_telegram_message(format_signal_message(signal_df))
+    send_telegram_photo(image_path, "Korea RS SIGNAL")
 
     print("\n" + "=" * 70)
     print("DONE")

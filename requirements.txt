@@ -4,3 +4,5 @@ yfinance
 openpyxl
 gspread
 google-auth
+pillow
+requests

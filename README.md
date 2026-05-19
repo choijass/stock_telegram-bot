@@ -21,7 +21,7 @@ The workflow now outputs only the `SIGNAL` table:
 - Prints the `SIGNAL` table in the Actions log
 - Saves `results/signal_YYYY-MM-DD.csv`
 - Updates only the `SIGNAL` worksheet in Google Sheets
-- Sends only the `SIGNAL` summary to Telegram
+- Sends the `SIGNAL` summary to Telegram as a PNG image card
 
 ## Google Sheets
 
