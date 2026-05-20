@@ -2,9 +2,6 @@ name: Scheduled Macro
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   schedule:
     # Every hour. GitHub cron is UTC.
     - cron: "0 * * * *"
