@@ -3,8 +3,8 @@ name: Scheduled Macro
 on:
   workflow_dispatch:
   schedule:
-    # Test schedule: every 10 minutes.
-    - cron: "*/10 * * * *"
+    # Test schedule: every 5 minutes.
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
