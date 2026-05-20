@@ -1,4 +1,4 @@
-name: Scheduled Macro
+name: SIGNAL Schedule Test
 
 on:
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
           RESULTS_DIR: "results"
         run: python macro.py
 
-      - name: Upload SIGNAL CSV artifact
+      - name: Upload SIGNAL artifact
         uses: actions/upload-artifact@v4
         with:
           name: signal-result
