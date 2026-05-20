@@ -1165,9 +1165,11 @@ def make_rank_change_text(rank_change):
         return "유지 ="
 
 
-def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=None):
+def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=None, previous_position_level=None):
     signal_count = len(signals)
     guide = get_position_guide(mode, signal_count)
+    previous_position_level = clean_signal_value(previous_position_level) if previous_position_level else "-"
+    position_change_text = f"전일: {previous_position_level} → 금일: {guide['Position_Level']}"
 
     rows = [
         ["Timestamp", NOW_STR],
@@ -1176,6 +1178,8 @@ def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=
         ["Signals", " | ".join(signals) if signals else "None"],
 
         ["Position_Level", guide["Position_Level"]],
+        ["Previous_Position_Level", previous_position_level],
+        ["Position_Change_Text", position_change_text],
         ["Recommended_Stock_Position", guide["Stock_Position"]],
         ["Recommended_Cash_Position", guide["Cash_Position"]],
         ["Action_Guide", guide["Action"]],
@@ -1193,6 +1197,33 @@ def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=
             "Top10_Names",
             ", ".join(top20["Name"].head(10).astype(str).tolist())
         ])
+        current_sectors = top20["Theme"].head(10).astype(str).value_counts()
+        buy_sectors = pd.Series(dtype=int)
+        sell_sectors = pd.Series(dtype=int)
+        if buy_df is not None and not buy_df.empty:
+            buy_sectors = ensure_theme_column(buy_df)["Theme"].head(8).astype(str).value_counts()
+        if sell_df is not None and not sell_df.empty:
+            sell_sectors = ensure_theme_column(sell_df)["Theme"].head(8).astype(str).value_counts()
+
+        sector_names = list(current_sectors.index)
+        for sector in list(buy_sectors.index) + list(sell_sectors.index):
+            if sector not in sector_names:
+                sector_names.append(sector)
+
+        sector_parts = []
+        for sector in sector_names:
+            current_count = int(current_sectors.get(sector, 0))
+            buy_count = int(buy_sectors.get(sector, 0))
+            sell_count = int(sell_sectors.get(sector, 0))
+            net_count = buy_count - sell_count
+            detail_text = ""
+            if net_count > 0:
+                detail_text = f"(+{net_count})"
+            elif net_count < 0:
+                detail_text = f"({net_count})"
+            sector_parts.append(f"{sector}:{current_count}{detail_text}")
+
+        rows.append(["Portfolio_Sectors", " | ".join(sector_parts)])
 
     if buy_df is not None and not buy_df.empty:
         portfolio_candidates = []
@@ -1296,6 +1327,8 @@ def format_signal_message(signal_df):
         "Signal_Count",
         "Signals",
         "Position_Level",
+        "Previous_Position_Level",
+        "Position_Change_Text",
         "Recommended_Stock_Position",
         "Recommended_Cash_Position",
         "Action_Guide",
@@ -1304,6 +1337,7 @@ def format_signal_message(signal_df):
         "Buy_Count",
         "Sell_Count",
         "Top10_Names",
+        "Portfolio_Sectors",
         "Portfolio_Candidates",
         "Portfolio_Replacement",
         "Current_Position_Comment",
@@ -1315,6 +1349,8 @@ def format_signal_message(signal_df):
         "Signal_Count": "위험신호 수",
         "Signals": "위험신호",
         "Position_Level": "포지션 단계",
+        "Previous_Position_Level": "전일 포지션 단계",
+        "Position_Change_Text": "포지션 변화",
         "Recommended_Stock_Position": "권장 주식비중",
         "Recommended_Cash_Position": "권장 현금비중",
         "Action_Guide": "대응",
@@ -1322,9 +1358,10 @@ def format_signal_message(signal_df):
         "Top20_Count": "TOP20 수",
         "Buy_Count": "매수후보 수",
         "Sell_Count": "매도후보 수",
-        "Top10_Names": "상위 종목",
-        "Portfolio_Candidates": "포트폴리오 후보",
-        "Portfolio_Replacement": "포트폴리오 교체",
+        "Top10_Names": "현 포트폴리오 구성 종목",
+        "Portfolio_Sectors": "섹터 구성",
+        "Portfolio_Candidates": "포트폴리오 (RS+이평구조)",
+        "Portfolio_Replacement": "포트폴리오 교체 예상종목",
         "Current_Position_Comment": "현재 해석",
     }
 
@@ -1338,6 +1375,10 @@ def get_signal_values(signal_df):
     if signal_df is None or signal_df.empty:
         return {}
     return dict(zip(signal_df["Item"].astype(str), signal_df["Value"].astype(str)))
+
+def get_previous_position_level(signal_df):
+    values = get_signal_values(signal_df)
+    return clean_signal_value(values.get("Position_Level", "")) or None
 
 def clean_signal_value(value):
     text = str(value)
@@ -1416,12 +1457,17 @@ def draw_kv_row(draw, x, y, label, value, label_font, value_font, label_fill, va
 
 def draw_position_scale(draw, x, y, width, current_level, font, bold_font):
     levels = ["최상위 공격", "공격 유지", "중립 전환 준비", "중립", "방어", "강한 방어", "최하위 방어", "현금 최우선"]
-    gap = 8
-    pill_h = 50
+    font = load_font(21)
+    bold_font = load_font(21, bold=True)
+    gap = 4
+    arrow_gap = 3
+    pill_h = 46
     cur_x = x
+    arrow_font = load_font(19, bold=True)
     for idx, level in enumerate(levels):
-        pill_w = int(draw.textlength(level, font=bold_font if level == current_level else font)) + 26
-        if cur_x + pill_w > x + width:
+        pill_w = int(draw.textlength(level, font=bold_font if level == current_level else font)) + 20
+        arrow_w = int(draw.textlength(">", font=arrow_font)) + arrow_gap * 2 if idx < len(levels) - 1 else 0
+        if cur_x + pill_w + arrow_w > x + width:
             cur_x = x
             y += pill_h + 10
         is_current = level == current_level
@@ -1430,8 +1476,12 @@ def draw_position_scale(draw, x, y, width, current_level, font, bold_font):
         text_fill = "white" if is_current else "#475569"
         use_font = bold_font if is_current else font
         draw.rounded_rectangle((cur_x, y, cur_x + pill_w, y + pill_h), radius=20, fill=fill, outline=outline, width=2)
-        draw.text((cur_x + 13, y + 10), level, font=use_font, fill=text_fill)
-        cur_x += pill_w + gap
+        draw.text((cur_x + 10, y + 10), level, font=use_font, fill=text_fill)
+        cur_x += pill_w
+        if idx < len(levels) - 1:
+            draw.text((cur_x + arrow_gap, y + 13), ">", font=arrow_font, fill="#94a3b8")
+            cur_x += arrow_w
+        cur_x += gap
     return y + pill_h
 
 def draw_stock_chips(draw, x, y, width, stocks, font, small_font):
@@ -1469,6 +1519,48 @@ def draw_theme_bars(draw, x, y, width, themes, font, bold_font):
         y += 50
     return y
 
+def draw_sector_flow_text(draw, x, y, width, value, font, up_fill="#dc2626", down_fill="#2563eb", text_fill="#1e3a8a"):
+    if not value or value == "-":
+        draw.text((x, y), "-", font=font, fill=text_fill)
+        return y + font.size + 8
+
+    cur_x = x
+    line_h = font.size + 10
+    gap = 8
+    pieces = [part.strip() for part in str(value).split("|") if part.strip()]
+
+    for idx, piece in enumerate(pieces):
+        sep = " | " if idx < len(pieces) - 1 else ""
+        marker_start = piece.rfind("(")
+        marker = ""
+        base = piece
+        marker_fill = text_fill
+        if marker_start != -1 and piece.endswith(")"):
+            base = piece[:marker_start]
+            marker = piece[marker_start:]
+            if marker.startswith("(+"):
+                marker_fill = up_fill
+            elif marker.startswith("(-"):
+                marker_fill = down_fill
+
+        segments = [(base, text_fill)]
+        if marker:
+            segments.append((marker, marker_fill))
+        if sep:
+            segments.append((sep, text_fill))
+
+        piece_w = sum(draw.textlength(text, font=font) for text, _ in segments)
+        if cur_x > x and cur_x + piece_w > x + width:
+            cur_x = x
+            y += line_h
+
+        for text_part, fill in segments:
+            draw.text((cur_x, y), text_part, font=font, fill=fill)
+            cur_x += draw.textlength(text_part, font=font)
+        cur_x += gap
+
+    return y + line_h
+
 def draw_numbered_list(draw, x, y, width, items, font, number_font, number_fill="#2563eb", text_fill="#334155", limit=8):
     if not items:
         draw.text((x, y), "-", font=font, fill=text_fill)
@@ -1487,7 +1579,7 @@ def make_signal_image(signal_df):
     values = {k: clean_signal_value(v) for k, v in get_signal_values(signal_df).items()}
 
     width = 1200
-    height = 1880
+    height = 1960
     margin = 56
     bg = "#f4f7fb"
     navy = "#172554"
@@ -1549,6 +1641,10 @@ def make_signal_image(signal_df):
     # position scale
     draw_card(draw, (margin, y, width - margin, y + 170), fill="white", outline=line)
     draw.text((margin + 30, y + 24), "포지션 단계 흐름", font=section_font, fill=navy)
+    position_change = values.get("Position_Change_Text", "")
+    if position_change:
+        change_w = draw.textlength(position_change, font=small_font)
+        draw.text((width - margin - 30 - change_w, y + 31), position_change, font=small_font, fill=red)
     draw_position_scale(draw, margin + 30, y + 88, content_w - 60, values.get("Position_Level", "-"), small_font, load_font(24, bold=True))
     y += 194
 
@@ -1572,17 +1668,20 @@ def make_signal_image(signal_df):
 
     # stocks
     stocks = split_list_value(values.get("Top10_Names", ""))
-    draw_card(draw, (margin, y, width - margin, y + 270), fill="white", outline=line)
-    draw.text((margin + 30, y + 28), "상위 종목 Top 10", font=section_font, fill=navy)
+    sector_text = values.get("Portfolio_Sectors", "-")
+    draw_card(draw, (margin, y, width - margin, y + 330), fill="white", outline=line)
+    draw.text((margin + 30, y + 28), "현 포트폴리오 구성 종목", font=section_font, fill=navy)
     draw_stock_chips(draw, margin + 30, y + 94, content_w - 60, stocks, chip_font, load_font(22))
-    y += 296
+    draw.text((margin + 30, y + 224), "섹터 구성", font=label_font, fill=muted)
+    draw_sector_flow_text(draw, margin + 190, y + 224, content_w - 220, sector_text, body_font)
+    y += 356
 
     # portfolio and replacement
     portfolio_items = split_pipe_value(values.get("Portfolio_Candidates", ""))
     replacement_items = split_pipe_value(values.get("Portfolio_Replacement", ""))
     left_w = (content_w - 24) // 2
     draw_card(draw, (margin, y, margin + left_w, y + 390), fill="white", outline=line)
-    draw.text((margin + 30, y + 28), "포트폴리오 후보", font=section_font, fill=navy)
+    draw.text((margin + 30, y + 28), "포트폴리오 (RS+이평구조)", font=section_font, fill=navy)
     draw_numbered_list(
         draw,
         margin + 30,
@@ -1598,7 +1697,7 @@ def make_signal_image(signal_df):
 
     right_x = margin + left_w + 24
     draw_card(draw, (right_x, y, width - margin, y + 390), fill="#fff7f7", outline="#fecaca")
-    draw.text((right_x + 30, y + 28), "포트폴리오 교체", font=section_font, fill=red)
+    draw.text((right_x + 30, y + 28), "포트폴리오 교체 예상종목", font=section_font, fill=red)
     draw_numbered_list(
         draw,
         right_x + 30,
@@ -1727,6 +1826,8 @@ def main():
 
     print("\n[12] THEME_FLOW_HISTORY 읽기")
     theme_flow_hist_df = read_gsheet_as_df(gc, GSHEET_NAME, "THEME_FLOW_HISTORY")
+    previous_signal_df = read_gsheet_as_df(gc, GSHEET_NAME, "SIGNAL")
+    previous_position_level = get_previous_position_level(previous_signal_df)
 
     print("\n[13] THEME_ROTATION 계산")
     theme_rotation_df = build_theme_rotation(theme_flow_df, theme_flow_hist_df)
@@ -1738,7 +1839,8 @@ def main():
         top20,
         buy_df,
         sell_df,
-        theme_rotation_df
+        theme_rotation_df,
+        previous_position_level
     )
 
     print("\n================ SIGNAL ================")
