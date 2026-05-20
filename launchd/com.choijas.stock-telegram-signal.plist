@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.choijas.stock-telegram-signal</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/choijas/Documents/Codex/2026-05-18/new-chat-2/github_macro_action/scripts/dispatch_signal_workflow.sh</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>600</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/choijas/Documents/Codex/2026-05-18/new-chat-2/github_macro_action/logs/launchd-dispatch.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/choijas/Documents/Codex/2026-05-18/new-chat-2/github_macro_action/logs/launchd-dispatch.err.log</string>
+</dict>
+</plist>
