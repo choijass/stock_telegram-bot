@@ -17,10 +17,17 @@ SECTION_LABELS = {
     "BOOM_SCORE": "Boom Score 상위 섹터",
     "ETF_SECTOR_RANK": "ETF 섹터 순위",
     "VALUE_THEME": "거래대금 폭발 테마",
-    "CLOSE_BUY_STOCK": "종가 매수 종목 후보",
-    "CLOSE_BUY_ETF": "종가 매수 ETF 후보",
+    "STOCK_CLOSE_BUY": "종가 매수 종목 후보",
+    "ETF_CLOSE_BUY": "종가 매수 ETF 후보",
     "RET_APPEARANCE": "등락률 출현 횟수",
     "SECTOR_EXPANSION": "섹터 종목 확산",
+}
+FIRST_PAGE_SECTIONS = {
+    "BOOM_SCORE",
+    "ETF_SECTOR_RANK",
+    "VALUE_THEME",
+    "STOCK_CLOSE_BUY",
+    "ETF_CLOSE_BUY",
 }
 
 
@@ -103,7 +110,19 @@ def run_analysis() -> list[dict]:
     return results["one_page_summary"]
 
 
-def render_summary(rows: list[dict]) -> pathlib.Path:
+def split_summary_rows(rows: list[dict]) -> list[list[dict]]:
+    first: list[dict] = []
+    second: list[dict] = []
+    for row in rows:
+        section = str(row.get("section", "SUMMARY"))
+        if section in FIRST_PAGE_SECTIONS:
+            first.append(row)
+        else:
+            second.append(row)
+    return [part for part in (first, second) if part]
+
+
+def render_summary(rows: list[dict], page_no: int, page_total: int) -> pathlib.Path:
     width = 1700
     margin_x = 70
     top = 64
@@ -157,10 +176,10 @@ def render_summary(rows: list[dict]) -> pathlib.Path:
     img = Image.new("RGB", (width, height), "#f3f6fb")
     draw = ImageDraw.Draw(img)
     draw.rounded_rectangle((34, 34, width - 34, height - 34), radius=28, fill="#ffffff")
-    draw.text((margin_x, 58), "국내 주식 트렌드 분석 | 한 페이지 요약", font=title_font, fill="#14213d")
+    draw.text((margin_x, 58), f"국내 주식 트렌드 분석 | 요약 {page_no}/{page_total}", font=title_font, fill="#14213d")
     draw.text(
         (margin_x, 112),
-        f"생성시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ·  총 {len(rows)}행",
+        f"생성시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ·  {page_no}/{page_total} 페이지 · {len(rows)}행",
         font=sub_font,
         fill="#6b7280",
     )
@@ -205,12 +224,12 @@ def render_summary(rows: list[dict]) -> pathlib.Path:
         y += row_h
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = RESULTS_DIR / f"stocktrend_one_page_summary_{datetime.now().strftime('%Y-%m-%d')}.png"
+    out_path = RESULTS_DIR / f"stocktrend_one_page_summary_{datetime.now().strftime('%Y-%m-%d')}_{page_no}of{page_total}.png"
     img.save(out_path)
     return out_path
 
 
-def send_telegram_photo(image_path: pathlib.Path) -> None:
+def send_telegram_photo(image_path: pathlib.Path, page_no: int, page_total: int) -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     required = os.getenv("TELEGRAM_REQUIRED", "").lower() == "true"
@@ -222,7 +241,7 @@ def send_telegram_photo(image_path: pathlib.Path) -> None:
         return
 
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    caption = f"[국내 주식 트렌드 분석]\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    caption = f"[국내 주식 트렌드 분석 {page_no}/{page_total}]\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     with image_path.open("rb") as fp:
         response = requests.post(
             url,
@@ -237,9 +256,13 @@ def send_telegram_photo(image_path: pathlib.Path) -> None:
 
 def main() -> None:
     rows = run_analysis()
-    image_path = render_summary(rows)
-    print("이미지 생성 완료:", image_path)
-    send_telegram_photo(image_path)
+    parts = split_summary_rows(rows)
+    page_total = len(parts)
+    image_paths = [render_summary(part, idx, page_total) for idx, part in enumerate(parts, start=1)]
+    for image_path in image_paths:
+        print("이미지 생성 완료:", image_path)
+    for idx, image_path in enumerate(image_paths, start=1):
+        send_telegram_photo(image_path, idx, page_total)
 
 
 if __name__ == "__main__":
