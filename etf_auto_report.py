@@ -277,6 +277,66 @@ def draw_card(draw, box, fill="white", outline="#dbe3ef", radius=22):
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=2)
 
 
+def short_etf_name(name):
+    text = str(name)
+    prefixes = [
+        "KODEX ", "TIGER ", "RISE ", "HANARO ", "SOL ", "ACE ", "KIWOOM ",
+        "PLUS ", "TIMEFOLIO ",
+    ]
+    for prefix in prefixes:
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    replacements = {
+        "미디어&엔터테인먼트": "미디어",
+        "반도체전공정": "반도체전공정",
+        "반도체후공정": "반도체후공정",
+        "2차전지소재FN": "2차전지소재",
+        "바이오 TOP10": "바이오",
+        "조선TOP3플러스": "조선",
+        "코리아밸류업": "밸류업",
+        "글로벌방산": "글로벌방산",
+        "친환경에너지": "친환경",
+        "우주항공&UAM": "우주항공",
+        "태양광&ESS": "태양광",
+        "인터넷TOP10": "인터넷",
+        "K바이오액티브": "K바이오",
+    }
+    return replacements.get(text, text)
+
+
+def format_table_value(col, value):
+    if pd.isna(value):
+        return ""
+    if col == "ETF명":
+        return short_etf_name(value)
+    if col == "종목명":
+        return str(value)
+    if col == "20일수익률":
+        return f"20D {value}%"
+    if col == "RS점수":
+        return f"RS {value}"
+    if col == "최근등락률":
+        return f"{value}%"
+    if col == "상승신호":
+        return str(value).replace(" 상승", "")
+    if col == "유지그룹":
+        return str(value).replace(" 유지그룹", "")
+    if col == "5일선유지일":
+        return f"5D {value}"
+    if col == "10일선유지일":
+        return f"10D {value}"
+    if col == "20일선유지일":
+        return f"20D {value}"
+    if col == "모멘텀TOP":
+        text = str(value)
+        if " (" in text:
+            name, score = text.rsplit(" (", 1)
+            return f"{short_etf_name(name)} ({score}"
+        return short_etf_name(text)
+    return str(value)
+
+
 def draw_text(draw, xy, text, font, fill, max_width, line_gap=8):
     x, y = xy
     words = str(text).split()
@@ -286,9 +346,23 @@ def draw_text(draw, xy, text, font, fill, max_width, line_gap=8):
         if draw.textlength(candidate, font=font) <= max_width:
             line = candidate
         else:
-            draw.text((x, y), line, font=font, fill=fill)
-            y += font.size + line_gap
-            line = word
+            if line:
+                draw.text((x, y), line, font=font, fill=fill)
+                y += font.size + line_gap
+                line = ""
+            if draw.textlength(word, font=font) > max_width:
+                chunk = ""
+                for char in word:
+                    candidate = chunk + char
+                    if draw.textlength(candidate, font=font) <= max_width:
+                        chunk = candidate
+                    else:
+                        draw.text((x, y), chunk, font=font, fill=fill)
+                        y += font.size + line_gap
+                        chunk = char
+                line = chunk
+            else:
+                line = word
     if line:
         draw.text((x, y), line, font=font, fill=fill)
         y += font.size + line_gap
@@ -305,8 +379,10 @@ def draw_table(draw, x, y, width, title, rows, columns, font, small_font, title_
         parts = []
         for col in columns:
             if col in row:
-                parts.append(f"{col} {row[col]}")
-        y = draw_text(draw, (x, y), f"{idx}. " + " / ".join(parts), small_font, "#334155", width, line_gap=5)
+                value = format_table_value(col, row[col])
+                if value:
+                    parts.append(value)
+        y = draw_text(draw, (x, y), f"{idx}. " + " · ".join(parts), small_font, "#334155", width, line_gap=5)
     return y
 
 
