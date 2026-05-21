@@ -118,9 +118,10 @@ def calculate_risk_adjusted_momentum(data, last_n_days=10):
     return pd.DataFrame.from_dict(result, orient="index", columns=[f"Top{i + 1}" for i in range(20)])
 
 
-def calculate_rs_rank(data, benchmark="069500.KS", lookback=20, top_n=5):
-    benchmark_return = data[benchmark].pct_change(lookback).iloc[-1] if benchmark in data.columns else data.pct_change(lookback).iloc[-1].mean()
-    etf_return = data.pct_change(lookback).iloc[-1]
+def calculate_rs_rank(data, benchmark="069500.KS", lookback=20, top_n=5, offset=0):
+    row_pos = -1 - offset
+    benchmark_return = data[benchmark].pct_change(lookback).iloc[row_pos] if benchmark in data.columns else data.pct_change(lookback).iloc[row_pos].mean()
+    etf_return = data.pct_change(lookback).iloc[row_pos]
     rs = etf_return - benchmark_return
     df = pd.DataFrame({
         "티커": rs.index,
@@ -128,9 +129,36 @@ def calculate_rs_rank(data, benchmark="069500.KS", lookback=20, top_n=5):
         "20일수익률": (etf_return * 100).round().astype("Int64"),
         "RS점수": (rs * 100).round().astype("Int64"),
     }).dropna()
-    df = df.sort_values("RS점수", ascending=False).head(top_n)
+    df = df.sort_values("RS점수", ascending=False)
     df.insert(0, "RS순위", range(1, len(df) + 1))
+    if top_n is not None:
+        df = df.head(top_n)
     return df
+
+
+def format_rank_change(current_rank, previous_rank):
+    if previous_rank is None or pd.isna(previous_rank):
+        return "NEW"
+    diff = int(previous_rank) - int(current_rank)
+    if diff > 0:
+        return f"▲{diff}"
+    if diff < 0:
+        return f"▼{abs(diff)}"
+    return "="
+
+
+def add_rank_change(current_df, previous_df, key_col="티커", rank_col="RS순위"):
+    if current_df is None or current_df.empty:
+        return current_df
+    out = current_df.copy()
+    prev_map = {}
+    if previous_df is not None and not previous_df.empty and key_col in previous_df.columns:
+        prev_map = dict(zip(previous_df[key_col], previous_df[rank_col]))
+    out["순위변동"] = [
+        format_rank_change(row[rank_col], prev_map.get(row[key_col]))
+        for _, row in out.iterrows()
+    ]
+    return out
 
 
 def count_consecutive_above(series, ma):
@@ -316,6 +344,8 @@ def format_table_value(col, value):
         return f"20D {value}%"
     if col == "RS점수":
         return f"RS {value}"
+    if col == "순위변동":
+        return str(value)
     if col == "최근등락률":
         return f"{value}%"
     if col == "상승신호":
@@ -335,6 +365,29 @@ def format_table_value(col, value):
             return f"{short_etf_name(name)} ({score}"
         return short_etf_name(text)
     return str(value)
+
+
+def parse_momentum_name(value):
+    text = str(value)
+    if " (" in text:
+        return text.rsplit(" (", 1)[0]
+    return text
+
+
+def build_momentum_rank_table(momentum_df, limit=10):
+    if momentum_df is None or momentum_df.empty:
+        return pd.DataFrame()
+    latest = momentum_df.iloc[-1].dropna().head(limit).tolist()
+    previous = momentum_df.iloc[-2].dropna().tolist() if len(momentum_df) >= 2 else []
+    previous_ranks = {parse_momentum_name(value): idx for idx, value in enumerate(previous, start=1)}
+    rows = []
+    for rank, value in enumerate(latest, start=1):
+        name = parse_momentum_name(value)
+        rows.append({
+            "모멘텀TOP": value,
+            "순위변동": format_rank_change(rank, previous_ranks.get(name)),
+        })
+    return pd.DataFrame(rows)
 
 
 def draw_text(draw, xy, text, font, fill, max_width, line_gap=8):
@@ -388,7 +441,7 @@ def draw_table(draw, x, y, width, title, rows, columns, font, small_font, title_
 
 def make_report_image(rs_top5_df, ma_hold_df, transition_df, inside_rs_df, momentum_df, valid_count, invalid_count):
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    width, height = 1200, 1760
+    width, height = 1200, 1900
     margin = 56
     bg = "#f4f7fb"
     navy = "#172554"
@@ -433,7 +486,7 @@ def make_report_image(rs_top5_df, ma_hold_df, transition_df, inside_rs_df, momen
     draw_card(draw, (margin, y, width - margin, y + 270), fill="white", outline=line)
     left_x = margin + 28
     right_x = margin + 560
-    draw_table(draw, left_x, y + 26, 500, "ETF RS TOP5", rs_top5_df, ["ETF명", "20일수익률", "RS점수"], body_font, small_font, limit=5)
+    draw_table(draw, left_x, y + 26, 500, "ETF RS TOP5", rs_top5_df, ["ETF명", "순위변동", "20일수익률", "RS점수"], body_font, small_font, limit=5)
     draw_table(draw, right_x, y + 26, 520, "이평 단계 상승 ETF", transition_df, ["ETF명", "상승신호", "최근등락률"], body_font, small_font, title_fill=red, limit=5)
     y += 296
 
@@ -445,13 +498,10 @@ def make_report_image(rs_top5_df, ma_hold_df, transition_df, inside_rs_df, momen
     draw_table(draw, margin + 28, y + 26, width - margin * 2 - 56, "상승 ETF 내부 RS 종목", inside_rs_df, ["ETF명", "종목명", "20일수익률", "RS점수"], body_font, small_font, title_fill=red, limit=8)
     y += 386
 
-    latest_momentum = pd.DataFrame()
-    if momentum_df is not None and not momentum_df.empty:
-        latest = momentum_df.iloc[-1].dropna().head(10).tolist()
-        latest_momentum = pd.DataFrame({"모멘텀TOP": latest})
-    draw_card(draw, (margin, y, width - margin, y + 270), fill="white", outline=line)
-    draw_table(draw, margin + 28, y + 26, width - margin * 2 - 56, "변동성 조정 모멘텀 TOP10", latest_momentum, ["모멘텀TOP"], body_font, small_font, limit=10)
-    y += 296
+    latest_momentum = build_momentum_rank_table(momentum_df, limit=10)
+    draw_card(draw, (margin, y, width - margin, y + 330), fill="white", outline=line)
+    draw_table(draw, margin + 28, y + 26, width - margin * 2 - 56, "변동성 조정 모멘텀 TOP10", latest_momentum, ["모멘텀TOP", "순위변동"], body_font, small_font, limit=10)
+    y += 356
 
     draw.text((margin, y), f"수집 성공 티커 {valid_count}개 / 제외 {invalid_count}개", font=body_font, fill=muted)
     path = RESULTS_DIR / f"etf_rs_report_{TODAY}.png"
@@ -488,7 +538,9 @@ def main():
 
     print("[2] 지표 계산")
     momentum_df = calculate_risk_adjusted_momentum(etf_data, last_n_days=10)
-    rs_top5_df = calculate_rs_rank(etf_data, top_n=5)
+    rs_all_df = calculate_rs_rank(etf_data, top_n=None)
+    previous_rs_all_df = calculate_rs_rank(etf_data, top_n=None, offset=1) if len(etf_data) > 22 else pd.DataFrame()
+    rs_top5_df = add_rank_change(rs_all_df.head(5), previous_rs_all_df)
     ma_hold_df = calculate_ma_hold_groups(etf_data)
     transition_df = detect_ma_transition(etf_data, lookback_days=5)
     inside_rs_df = calculate_stock_rs_inside_etf(data, transition_df, top_n=5)
