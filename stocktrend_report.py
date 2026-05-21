@@ -22,10 +22,12 @@ SECTION_LABELS = {
     "RET_APPEARANCE": "등락률 출현 횟수",
     "SECTOR_EXPANSION": "섹터 종목 확산",
 }
-FIRST_PAGE_SECTIONS = {
+PAGE_1_SECTIONS = {
     "BOOM_SCORE",
     "ETF_SECTOR_RANK",
     "VALUE_THEME",
+}
+PAGE_2_SECTIONS = {
     "STOCK_CLOSE_BUY",
     "ETF_CLOSE_BUY",
 }
@@ -100,6 +102,23 @@ def fmt_value(value: object) -> str:
     return str(value)
 
 
+def style_for_value(key: str, value: str) -> tuple[ImageFont.ImageFont, str]:
+    font = load_font(22)
+    color = "#111827"
+    if "강관심" in value:
+        return load_font(23, True), "#dc2626"
+    if "관심" in value:
+        return load_font(22, True), "#ef6c45"
+    if key == "rank":
+        font = load_font(23, True)
+        color = "#dc2626" if value in {"1", "2", "3"} else "#334155"
+    elif key == "score":
+        color = "#dc2626" if value and not value.startswith("-") else "#2563eb"
+    elif key == "name":
+        font = load_font(23, True)
+    return font, color
+
+
 def run_analysis() -> list[dict]:
     spec = importlib.util.spec_from_file_location("stocktrend_full_v3", SOURCE_PATH)
     if spec is None or spec.loader is None:
@@ -113,13 +132,16 @@ def run_analysis() -> list[dict]:
 def split_summary_rows(rows: list[dict]) -> list[list[dict]]:
     first: list[dict] = []
     second: list[dict] = []
+    third: list[dict] = []
     for row in rows:
         section = str(row.get("section", "SUMMARY"))
-        if section in FIRST_PAGE_SECTIONS:
+        if section in PAGE_1_SECTIONS:
             first.append(row)
-        else:
+        elif section in PAGE_2_SECTIONS:
             second.append(row)
-    return [part for part in (first, second) if part]
+        else:
+            third.append(row)
+    return [part for part in (first, second, third) if part]
 
 
 def render_summary(rows: list[dict], page_no: int, page_total: int) -> pathlib.Path:
@@ -206,15 +228,7 @@ def render_summary(rows: list[dict], page_no: int, page_total: int) -> pathlib.P
         x = table_x
         for key, _, col_w in columns:
             value = fmt_value(row.get(key))
-            font = body_font
-            color = "#111827"
-            if key == "rank":
-                font = load_font(23, True)
-                color = "#dc2626" if value in {"1", "2", "3"} else "#334155"
-            elif key == "score":
-                color = "#dc2626" if value and not value.startswith("-") else "#2563eb"
-            elif key == "name":
-                font = load_font(23, True)
+            font, color = style_for_value(key, value)
             yy = y + 13
             for line in wrap_text(draw, value, font, col_w - 24):
                 draw.text((x + 12, yy), line, font=font if yy == y + 13 else small_font, fill=color)
