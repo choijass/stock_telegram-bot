@@ -241,6 +241,8 @@ def calculate_stock_rs_inside_etf(data, transition_df, benchmark="069500.KS", lo
             if stock_ticker not in data.columns:
                 continue
             stock_ret = data[stock_ticker].pct_change(lookback).iloc[-1]
+            if pd.isna(stock_ret) or pd.isna(bench_ret):
+                continue
             rows.append({
                 "ETF명": etf_row["ETF명"],
                 "ETF상승신호": etf_row["상승신호"],
