@@ -2,6 +2,9 @@ name: ETF Auto Report
 
 on:
   workflow_dispatch:
+  schedule:
+    # Every hour. GitHub cron is UTC.
+    - cron: "0 * * * *"
 
 permissions:
   contents: read

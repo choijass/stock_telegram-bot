@@ -3,10 +3,8 @@ name: SIGNAL Scheduled Macro
 on:
   workflow_dispatch:
   schedule:
-    # 10:00, 12:00, 14:00, 15:30 KST, Monday-Friday.
-    # GitHub cron is UTC, so this is 01:00, 03:00, 05:00, 06:30 UTC.
-    - cron: "0 1,3,5 * * 1-5"
-    - cron: "30 6 * * 1-5"
+    # Every hour. GitHub cron is UTC.
+    - cron: "0 * * * *"
 
 permissions:
   contents: read
