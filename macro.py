@@ -1165,11 +1165,16 @@ def make_rank_change_text(rank_change):
         return "유지 ="
 
 
-def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=None, previous_position_level=None):
+def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=None, previous_position_level=None, previous_position_date=None):
     signal_count = len(signals)
     guide = get_position_guide(mode, signal_count)
     previous_position_level = clean_signal_value(previous_position_level) if previous_position_level else "-"
-    position_change_text = f"전일: {previous_position_level} → 금일: {guide['Position_Level']}"
+    previous_position_date = clean_signal_value(previous_position_date) if previous_position_date else "-"
+    current_position_date = TODAY
+    if previous_position_date and previous_position_date not in {"-", current_position_date}:
+        position_change_text = f"전일({previous_position_date}): {previous_position_level} → 금일({current_position_date}): {guide['Position_Level']}"
+    else:
+        position_change_text = f"직전({previous_position_date}): {previous_position_level} → 금일({current_position_date}): {guide['Position_Level']}"
 
     rows = [
         ["Timestamp", NOW_STR],
@@ -1178,6 +1183,7 @@ def build_signal_table(mode, signals, top20, buy_df, sell_df, theme_rotation_df=
         ["Signals", " | ".join(signals) if signals else "None"],
 
         ["Position_Level", guide["Position_Level"]],
+        ["Previous_Position_Date", previous_position_date],
         ["Previous_Position_Level", previous_position_level],
         ["Position_Change_Text", position_change_text],
         ["Recommended_Stock_Position", guide["Stock_Position"]],
@@ -1327,6 +1333,7 @@ def format_signal_message(signal_df):
         "Signal_Count",
         "Signals",
         "Position_Level",
+        "Previous_Position_Date",
         "Previous_Position_Level",
         "Position_Change_Text",
         "Recommended_Stock_Position",
@@ -1349,6 +1356,7 @@ def format_signal_message(signal_df):
         "Signal_Count": "위험신호 수",
         "Signals": "위험신호",
         "Position_Level": "포지션 단계",
+        "Previous_Position_Date": "전일 포지션 날짜",
         "Previous_Position_Level": "전일 포지션 단계",
         "Position_Change_Text": "포지션 변화",
         "Recommended_Stock_Position": "권장 주식비중",
@@ -1376,9 +1384,38 @@ def get_signal_values(signal_df):
         return {}
     return dict(zip(signal_df["Item"].astype(str), signal_df["Value"].astype(str)))
 
-def get_previous_position_level(signal_df):
+def date_from_timestamp(value):
+    text = clean_signal_value(value)
+    if not text or text == "-":
+        return None
+    return text[:10]
+
+def get_previous_position_snapshot(signal_df=None, history_df=None):
+    if history_df is not None and not history_df.empty and {"Date", "Position_Level"}.issubset(history_df.columns):
+        hist = history_df.copy()
+        hist["Date"] = hist["Date"].astype(str)
+        if "Timestamp" in hist.columns:
+            hist = hist.sort_values("Timestamp")
+        previous_days = hist[hist["Date"] < TODAY]
+        row = previous_days.iloc[-1] if not previous_days.empty else hist.iloc[-1]
+        return clean_signal_value(row.get("Position_Level", "")) or None, clean_signal_value(row.get("Date", "")) or None
+
     values = get_signal_values(signal_df)
-    return clean_signal_value(values.get("Position_Level", "")) or None
+    level = clean_signal_value(values.get("Position_Level", "")) or None
+    date = date_from_timestamp(values.get("Timestamp", ""))
+    return level, date
+
+def build_signal_history_row(signal_df):
+    values = get_signal_values(signal_df)
+    return pd.DataFrame([{
+        "Date": date_from_timestamp(values.get("Timestamp", "")) or TODAY,
+        "Timestamp": values.get("Timestamp", NOW_STR),
+        "Position_Level": values.get("Position_Level", ""),
+        "Mode": values.get("Mode", ""),
+        "Signal_Count": values.get("Signal_Count", ""),
+        "Recommended_Stock_Position": values.get("Recommended_Stock_Position", ""),
+        "Recommended_Cash_Position": values.get("Recommended_Cash_Position", ""),
+    }])
 
 def clean_signal_value(value):
     text = str(value)
@@ -1827,7 +1864,8 @@ def main():
     print("\n[12] THEME_FLOW_HISTORY 읽기")
     theme_flow_hist_df = read_gsheet_as_df(gc, GSHEET_NAME, "THEME_FLOW_HISTORY")
     previous_signal_df = read_gsheet_as_df(gc, GSHEET_NAME, "SIGNAL")
-    previous_position_level = get_previous_position_level(previous_signal_df)
+    signal_history_df = read_gsheet_as_df(gc, GSHEET_NAME, "SIGNAL_HISTORY")
+    previous_position_level, previous_position_date = get_previous_position_snapshot(previous_signal_df, signal_history_df)
 
     print("\n[13] THEME_ROTATION 계산")
     theme_rotation_df = build_theme_rotation(theme_flow_df, theme_flow_hist_df)
@@ -1840,7 +1878,8 @@ def main():
         buy_df,
         sell_df,
         theme_rotation_df,
-        previous_position_level
+        previous_position_level,
+        previous_position_date
     )
 
     print("\n================ SIGNAL ================")
@@ -1852,6 +1891,7 @@ def main():
 
     print("\n[15] Google Sheets SIGNAL 저장")
     write_df_to_gsheet(gc, GSHEET_NAME, "SIGNAL", signal_df)
+    append_df_to_gsheet(gc, GSHEET_NAME, "SIGNAL_HISTORY", build_signal_history_row(signal_df))
 
     print("\n[16] Telegram SIGNAL 발송")
     send_telegram_photo(image_path, "Korea RS SIGNAL")
