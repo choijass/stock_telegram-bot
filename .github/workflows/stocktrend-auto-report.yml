@@ -1,0 +1,50 @@
+name: Stock Trend Auto Report
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 10:00, 12:00, 14:00, 15:30 KST, Monday-Friday.
+    # GitHub cron is UTC, so this is 01:00, 03:00, 05:00, 06:30 UTC.
+    - cron: "0 1,3,5 * * 1-5"
+    - cron: "30 6 * * 1-5"
+
+permissions:
+  contents: read
+
+jobs:
+  run-stocktrend-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Korean fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-nanum
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run stock trend report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_REQUIRED: "true"
+          RESULTS_DIR: "results"
+        run: python stocktrend_report.py
+
+      - name: Upload stock trend image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stocktrend-one-page-summary
+          path: results/stocktrend_one_page_summary_*
+          if-no-files-found: warn
