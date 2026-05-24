@@ -196,6 +196,7 @@ THEMES = [
 
 
 def render(theme: dict[str, str]) -> pathlib.Path:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     width, height = 760, 2300
     image = Image.new("RGB", (width, height), theme["bg"])
     draw = ImageDraw.Draw(image)
