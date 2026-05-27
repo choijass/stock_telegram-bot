@@ -43,3 +43,25 @@ To send the `SIGNAL` summary to Telegram, add these repository secrets:
 TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID
 ```
+
+## Telegram News Collector
+
+`telegram_news_collector.py` runs the Telegram news collection workflow and is scheduled by
+`.github/workflows/telegram-news-collector.yml` on weekdays at 08:50, 12:20, and 15:40 KST.
+
+Required repository secrets:
+
+```text
+TELEGRAM_API_ID
+TELEGRAM_API_HASH
+TELEGRAM_SESSION_STRING
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+GOOGLE_SERVICE_ACCOUNT_JSON
+```
+
+Create `TELEGRAM_SESSION_STRING` once from a trusted local/Colab runtime:
+
+```bash
+TELEGRAM_API_ID=... TELEGRAM_API_HASH=... python tools_make_telegram_session.py
+```

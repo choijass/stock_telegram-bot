@@ -1,0 +1,51 @@
+name: Telegram News Collector
+
+on:
+  workflow_dispatch:
+  schedule:
+    # KST weekdays 08:50, 12:20, 15:40.
+    # GitHub Actions cron uses UTC.
+    - cron: "50 23 * * 0-4"
+    - cron: "20 3 * * 1-5"
+    - cron: "40 6 * * 1-5"
+
+concurrency:
+  group: telegram-news-collector
+  cancel-in-progress: false
+
+jobs:
+  collect-and-send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      TZ: Asia/Seoul
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+      TELEGRAM_SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
+      TELEGRAM_SESSION_B64: ${{ secrets.TELEGRAM_SESSION_B64 }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+      SEND_CHAT_ID: ${{ secrets.SEND_CHAT_ID }}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      SPREADSHEET_NAME: TELEGRAM_NEWS_ETF_RS_CLOSE_BET_SYSTEM
+      USE_GOOGLE_SHEETS: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Collect news and send Telegram messages
+        run: python telegram_news_collector.py
