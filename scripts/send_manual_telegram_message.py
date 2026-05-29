@@ -7,6 +7,7 @@ import requests
 
 MESSAGE_PATH = Path("manual_telegram_message.txt")
 MAX_LEN = 3800
+PARSE_MODE = os.getenv("TELEGRAM_PARSE_MODE", "").strip()
 
 
 def split_message(text: str, limit: int = MAX_LEN) -> list[str]:
@@ -45,6 +46,7 @@ def main() -> None:
             json={
                 "chat_id": chat_id,
                 "text": prefix + chunk,
+                **({"parse_mode": PARSE_MODE} if PARSE_MODE else {}),
                 "disable_web_page_preview": False,
             },
             timeout=30,
