@@ -6,7 +6,7 @@ from pathlib import Path
 import requests
 
 
-MESSAGE_PATH = Path("manual_telegram_message.txt")
+MESSAGE_PATH = Path(os.getenv("MESSAGE_PATH", "manual_telegram_message.txt"))
 MAX_LEN = 3800
 PARSE_MODE = os.getenv("TELEGRAM_PARSE_MODE", "").strip()
 

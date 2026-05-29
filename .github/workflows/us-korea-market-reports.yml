@@ -1,0 +1,41 @@
+name: US Korea Market Reports
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 21:00 UTC = 06:00 KST. Runs Tue-Sat KST after regular US market days.
+    - cron: "0 21 * * 1-5"
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_PARSE_MODE: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install requests
+        run: python -m pip install requests
+
+      - name: Send US market report
+        env:
+          MESSAGE_PATH: reports/us_market_report_1.txt
+        run: python scripts/send_manual_telegram_message.py
+
+      - name: Send Korea impact report
+        env:
+          MESSAGE_PATH: reports/korea_impact_report_2.txt
+        run: python scripts/send_manual_telegram_message.py
