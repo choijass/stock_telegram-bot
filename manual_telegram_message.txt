@@ -1,5 +1,5 @@
-✅ 종목 자동 리포트 테스트 발송
-기준시간: 2026-05-29 18:32
+✅ 링크 클릭 가능 버전
+✅ 종목 자동 리포트
 
 ✅ 플리토(29.89%)
 
@@ -13,6 +13,7 @@
 52주 거래량 순위 : 320위 / 368일
 시가총액 : 1,391억
 - 현재가 : 10,950원
+- 기준시간 : 2026-05-29 19:20
 
 📂 키워드
 플리토
@@ -22,29 +23,77 @@
 - 임원 (5%미만 중, 임원인자) / 1.0 / 4000.0 / 0.02 / 2025/12/08
 
 * 전환사채 / 메자닌 / 오버행 관련 뉴스
-1. 2025년 7월 28일 [GoogleNews] 플리토, 반기 매출 140억·영업이익 26억 원 달성
-2. 2025년 12월 22일 [GoogleNews] 플리토, 휴머노이드 로봇·AR 글라스 시장 개화 수혜-신한
-3. 2025년 7월 23일 [GoogleNews] [파워 e종목] 플리토, 글로벌 IT 업체향 공급 계약 규모↑ 등으로 올해 흑전?
-4. 2025년 9월 3일 [GoogleNews] [Who Is ?] 이정수 플리토 대표이사
-5. 2026년 2월 23일 [GoogleNews] 플리토, 日 통번역 수요 타고 실적 턴어라운드
-6. 2026년 1월 26일 [GoogleNews] [사람과 기술 42] 실시간 AI 통번역 관련 기사
-
+1. 2025년 7월 28일 [GoogleNews] 플리토, 반기 매출 140억·영업이익 26억 원 달성 - 플래텀(Platum) 
+   기사보기: https://news.google.com/rss/articles/CBMiSEFVX3lxTE1VY3owRDJudnRfOUhrNU1hZWMzWGdBek8wZG9nOTJYVWFHRmN3U0ppU3g5WmZ6SXJEdmtZM1lWbVF3UmxlX1lXMg?oc=5
+2. 2025년 12월 22일 [GoogleNews] 플리토, 휴머노이드 로봇·AR 글라스 시장 개화 수혜-신한 - 마켓인 
+   기사보기: https://news.google.com/rss/articles/CBMic0FVX3lxTE43clZCckJKWVdyaEw2RUM4Y0hRWTRTZzU4RXdMdDJiUkUwOWdseTdQRjZyVzlWeFA5RkY1bjRzTHh1QmN1MW8zRjRqdTZLQmx3dmxCajdxU0lTTUw0eERHR3hUTWQ2c0dkLWw2Ymp2aUswZzg?oc=5
+3. 2025년 7월 23일 [GoogleNews] [파워 e종목] 플리토, 글로벌 IT 업체향 공급 계약 규모↑ 등으로 올해 흑전? - 데일리인베스트 
+   기사보기: https://news.google.com/rss/articles/CBMia0FVX3lxTE41ZGxHaml3SmV4SjVva2tBY0NwUkJGZVBuR25neERHTVp4UHc3aThCb0VzOXJzSnQ0X2RVaE93aTZPV0xmbnBRWWF3Mkx4WmpFRmNtMGhDc3c0aXZ2Mi1UdTB1RDBqSGdpX0tN0gFvQVVfeXFMUEVUd21Lb2RVXy1mM3E1dTMtdmZlZlpnLWxBd05ubzF6SF9pa1ZqZmtuYnEwRHVQUDI5dDgtMkFXVjBkRFN0YXdjVjN5cmk4TzNyUWM0eklRLVpjUGw3RWZtTEE1N0lQdnJtRzdOTlY4?oc=5
+4. 2025년 9월 3일 [GoogleNews] [Who Is ?] 이정수 플리토 대표이사 - 비즈니스포스트 
+   기사보기: https://news.google.com/rss/articles/CBMic0FVX3lxTFBiN3pGSEw1ZU9DUmd4bFltMEcwVWxWeWVXZFBqcGEwV3Y2NnBhTl9BNDd2RVRCNXdKNEk0dU9VbWtWaFNQd0puR2NvNlo5cC0wTHhmeG5WQXlwQUVqUDJxNjF1Y3BDcnZJekZlUExyRXk3N28?oc=5
+5. 2026년 2월 23일 [GoogleNews] 플리토, 日 통번역 수요 타고 실적 턴어라운드 - 블로터 
+   기사보기: https://news.google.com/rss/articles/CBMiaEFVX3lxTFBVQ3c2VDVRUTN6QUxQMklzREhxVzJEWEhyUXJCSHBiNFM5UW9UYWU0SGFkWnZNazdiOXp3c2dfZnM4VktnV1J3dTJabklLNkZaelktRjU3N2VaV3hOSG5keC1wRGhYXzc20gFsQVVfeXFMTmx1ZGM5Nm45aXpobGNBcC1nMllkbUZsc3MyQzY4OUlFRHkzN0Q0bngtZDVWVkRaVGkwQ1cwal9nRnpBazdLbjQ4c0dLRl8wZ0ZRUFhyUFZiMjNjdF9SVHZxRzhMT2pUN0pKaFZF?oc=5
+6. 2026년 1월 26일 [GoogleNews] [사람과 기술 42] 사랑도 통역이 되는 시대가 올까?... 실시간 AI 통번역이 ‘언어 장벽’을 지우는 방식 - 테크42 
+   기사보기: https://news.google.com/rss/articles/CBMivAJBVV95cUxOOFVaT2FZVy1rdFhDOE9QSHBqekhUN1l3UkdEVFViaTNyajZoaXJlRWZVTURTTUZZV0l1QzdBUkJKT0pxazdSNWtsZElIenl1Ql9UVEh6RDFiZkh4YTlLbnZ2U21oOTJUSkN2dENKZlBsQmpxRkNEVGk3T3A1bkpPRG1JdFZrNWMtU1lrX2w5S29oLVZscVlfQ2dRSnFjNklVd213Z0xLUmVkbUtXcE44cHJnVEhUZUFqUHRLOV9GRFN3Y1BYZElBY21jZEdXTmdtd2E3MGFOT3VFVEgxbExRRkpuMHZTNE9yZGdJa1JNMGRzOHZTVVRRZXRnVk9PbVpyV0JELS1ycW9ldkRUc282ZmVRdjFGZW5ud3k1VWpCbEhkb21QRUZyeUxjaFlCS0VkOWdka3pGcVF1NGhj?oc=5
 * 증권사 보고서 / 목표가 관련 뉴스
-1. 2026년 5월 29일 [GoogleNews] 플리토, 1분기 매출 52억… AI 데이터·통번역 사업 동반 성장
-2. 2026년 2월 6일 [GoogleNews] 플리토 투자분석 2026. 02. 06
-3. 2025년 12월 22일 [GoogleNews] 플리토, 휴머노이드 로봇·AR 글라스 시장 개화 수혜-신한
-4. 2026년 4월 20일 [GoogleNews] [더벨]플리토, 대량 이미지 번역 시장 공략
-5. 2026년 5월 29일 [GoogleNews] 특징주, 플리토-AI 챗봇(챗GPT 등) 테마 상승세에 23.01% ↑
-6. 2026년 1월 27일 [GoogleNews] [급등주 핵심체크] 플리토, LLM 경쟁 체제에서 수혜 지속 전망
-7. 2026년 4월 3일 [GoogleNews] 플리토 투자분석 2026. 04. 03
-8. 2021년 4월 5일 [GoogleNews] 플리토, ‘번역시장의 유튜브’로 부상
-
-* 특징주/단독 뉴스 히스토리
-1. 2026년 5월 29일 [GoogleNews] 특징주, 플리토-AI 챗봇(챗GPT 등) 테마 상승세에 23.01% ↑
-2. 2025년 10월 13일 [GoogleNews] [특징주]플리토, 42억 공급계약 공시에↑
-3. 2025년 10월 13일 [GoogleNews] [특징주] 플리토, 42억 규모 AI 데이터 공급계약에 14% 급등
-4. 2026년 4월 3일 [GoogleNews] [특징주] 플리토 장중 강세…글로벌 IT기업에 AI 데이터 공급
-5. 2026년 5월 29일 [GoogleNews] 플리토, ‘챗 트랜스레이션’에 AI 기록·구조화 기능 추가
+1. 2026년 5월 29일 [GoogleNews] 플리토, 1분기 매출 52억… AI 데이터·통번역 사업 동반 성장 - 금강일보 
+   기사보기: https://news.google.com/rss/articles/CBMiakFVX3lxTE5ySU5HUU92bXdZT25sZGNrZnZFLXRSbXk1emkySTFVQ3lYLXZ0dVJNVUxjNVJoY1pWNHVrcXliZDgxeEs2cUQxYjhOcktpSXQzUzBRVVhwbTVVcVE2SllKT2gyVEFUdUE5N0E?oc=5
+2. 2026년 2월 6일 [GoogleNews] 플리토 투자분석 2026. 02. 06 - 주달 
+   기사보기: https://news.google.com/rss/articles/CBMic0FVX3lxTFBBQWljbXJKZHRZRERPUFJJOGRZdDl5MW40OFpXc085TlJZdC0wQ0NNVGFSeW5RaTFnRGZBZHlDNmMwTHBvTC1kNVpnOEpEaWVvQjFndi13cW5OU3I3Uk1zTEIyM3lJZlZUQm1CTmplZ3VnWXc?oc=5
+3. 2025년 12월 22일 [GoogleNews] 플리토, 휴머노이드 로봇·AR 글라스 시장 개화 수혜-신한 - 마켓인 
+   기사보기: https://news.google.com/rss/articles/CBMic0FVX3lxTE43clZCckJKWVdyaEw2RUM4Y0hRWTRTZzU4RXdMdDJiUkUwOWdseTdQRjZyVzlWeFA5RkY1bjRzTHh1QmN1MW8zRjRqdTZLQmx3dmxCajdxU0lTTUw0eERHR3hUTWQ2c0dkLWw2Ymp2aUswZzg?oc=5
+4. 2026년 4월 20일 [GoogleNews] [더벨]플리토, 대량 이미지 번역 시장 공략 - 머니투데이 - 머니투데이 
+   기사보기: https://news.google.com/rss/articles/CBMiaEFVX3lxTFBPNE9yd2hiZGthMk03ckxCRk1BdnZsT3VwbW9tUHk1aUIwbnJEc0xJb1NWX2JkSTRMNU1EY1ZuWTdvcjRyd2hKY1FLN1Z0cTBwdHhkMmU0WkhVZWhEa3dGMjVVRFlqNkFB0gFuQVVfeXFMTzhQdHQwZlMxSXFMQkFxUEFxVWF5MEtnT0x3N25XU2xRUDRLX2xwRUZoYXppRUhBQ19CYWgzZ1k5WmVhLUk2MTJtNkMzZGhXTFFRSEpUc3ZMWGFKN3JPUXhoWTRRbWpFSFQwUzlUYUE?oc=5
+5. 2026년 5월 29일 [GoogleNews] 특징주, 플리토-AI 챗봇(챗GPT 등) 테마 상승세에 23.01% ↑ - 매일경제 
+   기사보기: https://news.google.com/rss/articles/CBMiUkFVX3lxTE9wOFJkN254Tjl6dTVmYlVYSXRyZWM4QW1PdzhmUXZRV1pjODhEQWQwdFlKWVJQVTZDV3I4ZkhLdG1jUkpGYU9qV0FUU0RGU0RuQXc?oc=5
+6. 2026년 1월 27일 [GoogleNews] [급등주 핵심체크] 플리토, LLM 경쟁 체제에서 수혜 지속 전망…주가 고공행진? - 데일리인베스트 
+   기사보기: https://news.google.com/rss/articles/CBMia0FVX3lxTFBjQjBtcmFCX3RCSFVoQWE4Umw0QTI1aHpBYVIybjFaNnVHdkQ0VS10YURXY3VYb0U0WXZGWjllVjhKTDlaR0xMbFFiMTdzSENGajh5SzByWkVzbGhDWVJubndjVkhIaVRJbUpN0gFvQVVfeXFMTWhZZm1XcjdiU2lGTnFKaW9kR2hlSV9BU3otTjR3cVRIVEV5bHJQRENRZkkxU3d4b3FiQVpLZll3bGFGS1JNeTU2OVZsLXAwS1hkTGFXQXA0eVdaRk5mLWtmV3ZFZVNjRG9rOW9uTHAw?oc=5
+7. 2026년 4월 3일 [GoogleNews] 플리토 투자분석 2026. 04. 03 - 주달 
+   기사보기: https://news.google.com/rss/articles/CBMic0FVX3lxTE51cFVNZ2tEZjAzVUEyQ2xEUzUweGs5QlkzQ3BkdVREdjY3dHJqLVc3Rm91cGFHTUtieEVRZWRkWHRkdEdETlUxSWc3UktZZkNMSkMzNW5pY281ZVcyZEJHTkVyTmRRckNFNjd5TmtQQlJvV0E?oc=5
+8. 2021년 4월 5일 [GoogleNews] 플리토, ‘번역시장의 유튜브’로 부상…저평가 벗어나나 - 머니투데이 - 머니투데이 
+   기사보기: https://news.google.com/rss/articles/CBMiaEFVX3lxTE9yb1MtenpxSnBOb0VURUk2VlFGRVN0OVFtaE5aZFRJQmpKcmgzNUowU0pYMHF4STA5MUVoYjZvRGF5VXd2WGpIM2pnUUlfNUlEaG1PajdmNl94cTVQNDVkRmRmWjFWODh30gFuQVVfeXFMT1B5enVlR0Jrc2J4NjFNaEdpaTNoR0lYWjd4WVBwX25kTktJN19CU2lldVR2ODYtZ1B5TjVoX0dxVXI0MUQ3dTJFTnduS09ISVBacHRKRUswYUdBU2ZudkdIWk55bElSbE1rMlcxTHc?oc=5
+특징주/단독 뉴스 히스토리
+1. 2026년 5월 29일 [GoogleNews] 특징주, 플리토-AI 챗봇(챗GPT 등) 테마 상승세에 23.01% ↑ - 매일경제 마켓 
+   기사보기: https://news.google.com/rss/articles/CBMiYEFVX3lxTE8yeWc3bmZvUjY2TGhuQm1wcVk3UVB5ckhxdlRqSkpXbV82cDVUNXl2MzZfWUJ3eVpxVUtUbDlENGxhRFluNXNtOTFEQmFvVl9mQXFXVGpjWVgtR1U0MUQ2OQ?oc=5
+2. 2025년 10월 13일 [GoogleNews] [특징주]플리토, 42억 공급계약 공시에↑ - 아시아경제 
+   기사보기: https://news.google.com/rss/articles/CBMiYkFVX3lxTFB0UXJ6YnZGeFFiR0d2NGs3LTZGeWxqdHloaFNJRXlEcGw0d0lURVQyYUV2NE02NGNQQ0JtZWNLY2VIMHVVZWxUM2xTWmpLejZlWjVZUzJiNEdTTU1lS1NFOU5R?oc=5
+3. 2025년 10월 13일 [GoogleNews] [특징주] 플리토, 42억 규모 AI 데이터 공급계약에 14% 급등…AI 사업 확장 기대감 - 와이드경제 
+   기사보기: https://news.google.com/rss/articles/CBMibEFVX3lxTE16RHFweHFwTUJ0U2xGZ3pkU2dtdm0xVUtUZnRScnlHRzBLNE44WlpkcW5qcXFEWjl5NEZGZkxldC0xWjdCWThfWjg4TW5iMHo5OHZEQWZuOUxPR2Q2WmlnNVlxOXVGUFU1d1ZfdA?oc=5
+4. 2026년 4월 3일 [GoogleNews] [특징주] 플리토 장중 강세…글로벌 IT기업에 AI 데이터 공급 - 비즈트리뷴 
+   기사보기: https://news.google.com/rss/articles/CBMicEFVX3lxTE5qYVlDZDF5U3J2ODlBMnFwQy1IeThMcGE3N0U4QWZmMnBjYWd2NkVTblNVU1dyYkVuVms2YTFxSDNNa3VLSEI3YUxBelFGem9Ia3NhLUVlMWx2U2twNGU5MUNmMlNPc0JkcExfbHNFVFk?oc=5
+5. 2026년 5월 29일 [GoogleNews] 플리토, ‘챗 트랜스레이션’에 AI 기록·구조화 기능 추가 - 서울경제 
+   기사보기: https://news.google.com/rss/articles/CBMiUkFVX3lxTE1yWU90VmUwWUlNOHF5T3pOeDhETGhCZHVCbmFaU2M1b3pxZE9WQUtoX2tQWWVRSGpHVTdwZ1hvYU9PT0tPcVp0cXplZTVEVjJNUGfSAVNBVV95cUxNWVVkS0sxalZ0WENydTMwMVA0Yk53NDhENzdKNTV6WHRJbkk2eDdWeG9pTUY2eUR2UlE1QWw1VHpYd2NSMW1YWWNGZ3FQcnhGMGROcw?oc=5
+6. 2025년 11월 13일 [GoogleNews] 플리토, AI데이터 수주잔고 42억원...빅테크 수주 지속성 증명 - 디일렉 
+   기사보기: https://news.google.com/rss/articles/CBMiZkFVX3lxTFBUQ0RPSWUySEJXdlduUkFsUVlhRHA1NWRHMXlHMy0xTTlTdXNFemhydi1wSEEtZmM3N3pwbGI4QnRtdm9Xa1Vhem43cWFyOVNHemF3MlVkZ1llTlZfZHJuM2pheEdhZw?oc=5
+7. 2025년 9월 6일 [GoogleNews] 이정수 플리토 대표 "음성 데이터 글로벌 수요 급증...AI 핵심 될 것" - AI타임스 
+   기사보기: https://news.google.com/rss/articles/CBMiakFVX3lxTE9YMVh2RGJDRl9ULVY2Rl9MVmV3eG0xbU5yS2hsSmNzNHRmbV93b045bmFma0R2OUQyWGlEdEZtVmFCc19jRFpNemllRzNpUk1jZEJWRlpra2JhZ1hsRlVzUGg2LVBqR29wc2c?oc=5
+8. 2026년 1월 6일 [GoogleNews] [K-AI 이노베이터①] 플리토 "AI 학습 공개 데이터 곧 소멸...우린 지속 생산 가능" - 아이뉴스24 
+   기사보기: https://news.google.com/rss/articles/CBMiTEFVX3lxTE5KMUU1TmpiQTkxd1JJQkNiMUw1SjB4aEhWLVQzeFNZMTYzSGhUWU00a3BOcF9qTUI4YUtmcF9yV2FrTXpmZTF0S0ZpQXU?oc=5
+9. 2026년 5월 29일 [GoogleNews] [급등락주 짚어보기] LGㆍ엔비디아 회동설에 LG그룹주 ‘상한가’⋯상폐 종목 줄줄이 下 - 이투데이 
+   기사보기: https://news.google.com/rss/articles/CBMiVEFVX3lxTE91N1RrQmE1Tk4yenI3MzBmMUFuT0ZmSnZFR2xJZmptR091U0lKRjBMWld6bzlnMEVHNTRKd3hwdk4teDFRclR3dmNacnMxei1RYXhwWQ?oc=5
+10. 2026년 5월 29일 [GoogleNews] 특징주, SBI인베스트먼트-창투사 테마 상승세에 47.79% ↑ - 매일경제 마켓 
+   기사보기: https://news.google.com/rss/articles/CBMiUkFVX3lxTE53Yno5cVowYTB1a0VzUTB0aGllLUVrOWExakVJLXcxeUtRTEl2UDhTMkNQM3hzaWxreUhpQTNIajFwcS12d2hYdm1faU5lQ2lqaFE?oc=5
+과거 주요 기사 모음 (최근 순)
+1. 2026년 5월 28일 [GoogleNews] 플리토, 애프터마켓서 10%대 급등 - 연합뉴스 
+   기사보기: https://news.google.com/rss/articles/CBMiYEFVX3lxTE56Y3NQdE5MRk5Wam42cW55STl6MGRSdF9GTlU0Z2wwdXdvSEx0ZnRPX2Z4VUtZYnhiVkl2Nmc2aC02XzdtVDNCaFhTOGJwekZPSzkwRi12UVl6ZTI0MEx6V9IBYEFVX3lxTE56Y3NQdE5MRk5Wam42cW55STl6MGRSdF9GTlU0Z2wwdXdvSEx0ZnRPX2Z4VUtZYnhiVkl2Nmc2aC02XzdtVDNCaFhTOGJwekZPSzkwRi12UVl6ZTI0MEx6Vw?oc=5
+2. 2026년 5월 29일 [GoogleNews] 특징주, 플리토-AI 챗봇(챗GPT 등) 테마 상승세에 23.01% ↑ - 매일경제 마켓 
+   기사보기: https://news.google.com/rss/articles/CBMiYEFVX3lxTE8yeWc3bmZvUjY2TGhuQm1wcVk3UVB5ckhxdlRqSkpXbV82cDVUNXl2MzZfWUJ3eVpxVUtUbDlENGxhRFluNXNtOTFEQmFvVl9mQXFXVGpjWVgtR1U0MUQ2OQ?oc=5
+3. 2026년 5월 29일 [GoogleNews] 플리토, 1분기 매출 52억… AI 데이터·통번역 사업 동반 성장 - 금강일보 
+   기사보기: https://news.google.com/rss/articles/CBMiakFVX3lxTE5ySU5HUU92bXdZT25sZGNrZnZFLXRSbXk1emkySTFVQ3lYLXZ0dVJNVUxjNVJoY1pWNHVrcXliZDgxeEs2cUQxYjhOcktpSXQzUzBRVVhwbTVVcVE2SllKT2gyVEFUdUE5N0E?oc=5
+4. 2026년 5월 29일 [GoogleNews] ‘매도 폭탄에 국장 늘리는’ 국민연금, 누가 반대하나? [뉴스톡 웰스톡] - 뉴스웰 
+   기사보기: https://news.google.com/rss/articles/CBMibEFVX3lxTE1GNmtJVXJDbGFNT2NUS190YkdyNDRfdjdqdS1UcVRhRXROeWYxUGE0UTE0MVVERTRyZ1lPUjlSRmw4RjRfcThUSzA4UDFsSVphNlJnaDdleXNRaWRzUzV5dHlwUmdrd2t1TUt4bQ?oc=5
+5. 2026년 5월 29일 [GoogleNews] 플리토, 실시간 AI 통역에 기록·요약 기능 더했다 - 네이트 
+   기사보기: https://news.google.com/rss/articles/CBMiU0FVX3lxTE1ueVZWcHJDVmxWblRpbF9DeEJjb1MzZXY1aENqMWI4SDFDSDNUamhoMlBEZkoyZkVsUEpBYlpDejlrUWNXcWZPWVVaLXZDNWI0RHRv?oc=5
+6. 2026년 5월 28일 [GoogleNews] [프리마켓 포커스] 국민연금·중동·뉴욕 증시발 호재에 대형주 '빨간불' - the-biz.co.kr 
+   기사보기: https://news.google.com/rss/articles/CBMia0FVX3lxTE8xbjJKOTNwX0pHYmtSQVNjYmlrRnBjeHpZY05qVXRnRXJHMW43YjJ1Zk04NDEzNWFpT3A3Ql9sWV9Oc0psQ3VPZEFSRDRYeVNyWm1nZkZlMDVFdVUxSm9SdW9OME9nZEFSWUhz?oc=5
+7. 2026년 1월 27일 [GoogleNews] [급등주 핵심체크] 플리토, LLM 경쟁 체제에서 수혜 지속 전망…주가 고공행진? - 데일리인베스트 
+   기사보기: https://news.google.com/rss/articles/CBMia0FVX3lxTFBjQjBtcmFCX3RCSFVoQWE4Umw0QTI1aHpBYVIybjFaNnVHdkQ0VS10YURXY3VYb0U0WXZGWjllVjhKTDlaR0xMbFFiMTdzSENGajh5SzByWkVzbGhDWVJubndjVkhIaVRJbUpN0gFvQVVfeXFMTWhZZm1XcjdiU2lGTnFKaW9kR2hlSV9BU3otTjR3cVRIVEV5bHJQRENRZkkxU3d4b3FiQVpLZll3bGFGS1JNeTU2OVZsLXAwS1hkTGFXQXA0eVdaRk5mLWtmV3ZFZVNjRG9rOW9uTHAw?oc=5
+8. 2025년 11월 25일 [GoogleNews] [생생한 주식쇼 생쇼] 플리토 (300080) 요약 - 매일경제TV 
+   기사보기: https://news.google.com/rss/articles/CBMiaEFVX3lxTE0xUjQzOG0wOS1NbkYwcW5UaTY4UUtRSTZNVkxfWTBfeWJOTk1yR05DNXZ2UlBXeUhPamY1RmNQQkpHb25abS1ybmZkeVVVeHlCeXZISE44YmZ0czVCTHYxNGM5WVMyaWtI?oc=5
+9. 2025년 10월 28일 [GoogleNews] [특징주]플리토, '어닝서프라이즈'에 20%대 급등 - 아시아경제 
+   기사보기: https://news.google.com/rss/articles/CBMiYkFVX3lxTE5EN2Jpb3Q0YWlEdUFOVm9oUC1BZklRM1RWRDVzMERRQkU1UjNHcWxta3NfNE92U05RN1FYUHFOenVJcXhBRzhsSUwzUHhkWlVtYnJUWWJfa0VlNDFpWVFfeC1n?oc=5
+10. 2026년 5월 22일 [GoogleNews] 플리토 주가, 5월 22일 9,680원 12.82% 상승 마감 - 톱스타뉴스 
+   기사보기: https://news.google.com/rss/articles/CBMickFVX3lxTE5KczQwaEZUN19hSE5XN0w4clJwWlZYZmZVTG54YnNBQjJWVm9mR2plNV9XQkxkQmJGcGRUdU5scGUwQkJaLTBZNGo5ZU9Dc0FPM2QxeUMydXdYYkxZbFpUVHVvRnZfVG5PN3A2d0RUZ01vdw?oc=5
 
 * 주요지표
 PBR : 8.38
@@ -53,8 +102,9 @@ PBR : 8.38
 
 * 최근실적
 (매출/영업익/순익)
+
 2026.1Q / 37억 / -3억 / -1억
 2025.4Q / 80억 / 1억 / 5억
 
-회사정보 : https://finance.naver.com/item/main.naver?code=300080
-FnGuide : https://comp.fnguide.com/SVO2/ASP/SVD_Main.asp?pGB=1&gicode=A300080&cID=&MenuYn=Y&ReportGB=&NewMenuID=101&stkGb=701
+회사정보 : 네이버 종목정보: https://finance.naver.com/item/main.naver?code=300080
+FnGuide : 기업정보 보기: https://comp.fnguide.com/SVO2/ASP/SVD_Main.asp?pGB=1&gicode=A300080&cID=&MenuYn=Y&ReportGB=&NewMenuID=101&stkGb=701
