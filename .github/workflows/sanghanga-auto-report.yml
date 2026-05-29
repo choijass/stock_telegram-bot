@@ -1,0 +1,50 @@
+name: Sanghanga Auto Report
+
+on:
+  workflow_dispatch:
+  schedule:
+    # KST weekdays 10:00, 12:00, 14:00, 15:30.
+    # GitHub Actions cron uses UTC.
+    - cron: "0 1 * * 1-5"
+    - cron: "0 3 * * 1-5"
+    - cron: "0 5 * * 1-5"
+    - cron: "30 6 * * 1-5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sanghanga-auto-report
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Asia/Seoul
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      SANGHANGA_TELEGRAM_CHAT_ID: "@sang_red"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Send sanghanga report
+        run: python scripts/send_sanghanga_report.py
+
+      - name: Save 신규진입 state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/sanghanga_seen.json
+          git diff --cached --quiet || git commit -m "Update sanghanga seen state"
+          git push
