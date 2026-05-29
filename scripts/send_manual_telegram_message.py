@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from pathlib import Path
 
@@ -11,6 +12,9 @@ PARSE_MODE = os.getenv("TELEGRAM_PARSE_MODE", "").strip()
 
 
 def split_message(text: str, limit: int = MAX_LEN) -> list[str]:
+    if PARSE_MODE.upper() == "HTML" and visible_len(text) <= limit:
+        return [text.strip()]
+
     chunks: list[str] = []
     remaining = text.strip()
 
@@ -29,6 +33,10 @@ def split_message(text: str, limit: int = MAX_LEN) -> list[str]:
         remaining = remaining[cut:].strip()
 
     return chunks
+
+
+def visible_len(text: str) -> int:
+    return len(re.sub(r"<[^>]+>", "", text))
 
 
 def main() -> None:
