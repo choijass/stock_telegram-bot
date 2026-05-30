@@ -115,7 +115,7 @@ def signal_from_logs(start: date, end: date) -> list[dict[str, str]]:
         )
         if log_response.status_code >= 400:
             continue
-        row = parse_signal_log(log_response.text)
+        row = parse_signal_log(log_response.content.decode("utf-8", errors="replace"))
         if row:
             local_day = (created + timedelta(hours=9)).date()
             key = local_day.isoformat()
