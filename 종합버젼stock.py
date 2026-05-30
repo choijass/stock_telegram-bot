@@ -308,6 +308,17 @@ def build_signal_section(start: date, end: date) -> tuple[str, list[str]]:
         lines.append(bullet(f"포지션: {positions[0]} 유지" if len(set(positions)) == 1 else f"포지션: {' -> '.join(positions)}"))
         lines.append(bullet(f"위험신호: {risks}"))
         lines.append(bullet(f"매수후보: {buys}"))
+        lines.append("")
+        lines.append("📋 월~금 상세")
+        for row in rows:
+            day = datetime.fromisoformat(row["Date"]).strftime("%m-%d")
+            lines.append(
+                bullet(
+                    f"{day} | {row.get('Mode', '-').replace('_MODE', '')} | 위험 {row.get('Signal_Count', '-')} | "
+                    f"{row.get('Position_Level', '-')} | 주식 {row.get('Recommended_Stock_Position', '-')} | "
+                    f"현금 {row.get('Recommended_Cash_Position', '-')} | 매수 {row.get('Buy_Count', '-')}"
+                )
+            )
         lines.extend(
             [
                 "",
