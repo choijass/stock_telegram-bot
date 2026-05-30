@@ -20,7 +20,22 @@ import stocktrend_full_v3
 
 
 LABELS = ["월", "화", "수", "목", "금"]
-DIVIDER = "------------------------------"
+DIVIDER = "================================"
+SUBDIVIDER = "--------------------------------"
+STOCK_SECTOR_ALIASES = {
+    "반도체": ["AI반도체", "반도체소부장"],
+    "시스템반도체": ["AI반도체", "반도체소부장"],
+    "AI/테크": ["AI반도체", "반도체소부장", "인터넷"],
+    "2차전지": ["2차전지"],
+    "방산": ["방산", "우주항공/UAM"],
+    "원전": ["원전", "전력기기"],
+    "전력기기": ["전력기기"],
+    "조선": ["조선"],
+    "바이오": ["바이오"],
+    "인터넷": ["인터넷"],
+    "금융": ["금융"],
+    "자동차": ["자동차"],
+}
 
 
 def week_range(today: date | None = None) -> tuple[date, date]:
@@ -57,7 +72,7 @@ def compact_list(items: list[str], limit: int = 5) -> str:
 
 
 def section_header(icon: str, title: str, subtitle: str) -> str:
-    return f"{DIVIDER}\n{icon} {title}\n{subtitle}"
+    return f"{DIVIDER}\n{icon} {title}\n{subtitle}\n{SUBDIVIDER}"
 
 
 def bullet(text: str) -> str:
@@ -66,6 +81,90 @@ def bullet(text: str) -> str:
 
 def metric_line(label: str, value: str) -> str:
     return f"  - {label}: {value}"
+
+
+def pipe_items(text: str, limit: int | None = None) -> list[str]:
+    items = [item.strip() for item in str(text or "-").split("|") if item.strip()]
+    return items[:limit] if limit else items
+
+
+def names_from_candidates(text: str, limit: int = 8) -> str:
+    names: list[str] = []
+    for item in pipe_items(text):
+        name = item.split("(", 1)[0].strip()
+        if name:
+            names.append(name)
+    return compact_list(names, limit)
+
+
+def detail_lines(text: str, limit: int = 4) -> list[str]:
+    return [f"  - {item}" for item in pipe_items(text, limit)]
+
+
+def stock_members_for_sector(sector: str) -> list[tuple[str, str]]:
+    names = STOCK_SECTOR_ALIASES.get(sector, [sector])
+    members: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for name in names:
+        for stock_name, ticker in stocktrend_full_v3.SECTORS.get(name, []):
+            if ticker not in seen:
+                members.append((stock_name, ticker))
+                seen.add(ticker)
+    return members
+
+
+def top_stock_lines_by_sector(sectors: list[str], target_day: date) -> list[str]:
+    sector_members = {sector: stock_members_for_sector(sector) for sector in sectors}
+    tickers = sorted({ticker for members in sector_members.values() for _name, ticker in members})
+    if not tickers:
+        return ["- 실제 종목 데이터 없음"]
+
+    raw = yf.download(tickers, period="9mo", auto_adjust=True, progress=False, threads=True)
+    if isinstance(raw.columns, pd.MultiIndex):
+        close = raw["Close"].sort_index().dropna(how="all")
+        volume = raw["Volume"].sort_index().dropna(how="all") if "Volume" in raw.columns.get_level_values(0) else pd.DataFrame(index=close.index)
+    else:
+        close = raw[["Close"]].rename(columns={"Close": tickers[0]})
+        volume = raw[["Volume"]].rename(columns={"Volume": tickers[0]})
+
+    day = nearest(close.index, pd.Timestamp(target_day))
+    if day is None:
+        return ["- 실제 종목 데이터 없음"]
+
+    lines: list[str] = []
+    for sector in sectors:
+        scored = []
+        for stock_name, ticker in sector_members.get(sector, []):
+            if ticker not in close.columns:
+                continue
+            series = close[ticker].dropna()
+            if day not in series.index:
+                continue
+            pos = series.index.get_loc(day)
+            if pos < 20:
+                continue
+            ret5 = series.pct_change(5).iloc[pos] * 100
+            ret20 = series.pct_change(20).iloc[pos] * 100
+            vol_ratio = np.nan
+            if not volume.empty and ticker in volume.columns:
+                vol_series = volume[ticker].dropna()
+                if day in vol_series.index:
+                    vol_pos = vol_series.index.get_loc(day)
+                    avg20 = vol_series.rolling(20).mean().iloc[vol_pos]
+                    vol_ratio = vol_series.iloc[vol_pos] / avg20 if avg20 else np.nan
+            score = float(np.nan_to_num(ret5, nan=0)) * 2 + float(np.nan_to_num(ret20, nan=0)) + float(np.nan_to_num(vol_ratio, nan=1)) * 5
+            scored.append((stock_name, score, ret5, ret20, vol_ratio))
+        scored.sort(key=lambda item: item[1], reverse=True)
+        top = scored[:3]
+        if not top:
+            lines.append(f"- {sector}: 실제 종목 데이터 없음")
+            continue
+        stock_text = " / ".join(
+            f"{name}(5D {ret5:.1f}%, 20D {ret20:.1f}%, 거래 {vol:.1f}x)"
+            for name, _score, ret5, ret20, vol in top
+        )
+        lines.append(f"- {sector}: {stock_text}")
+    return lines
 
 
 def request_json(url: str, token: str) -> dict:
@@ -176,32 +275,33 @@ def build_signal_section(start: date, end: date) -> tuple[str, list[str]]:
         latest = rows[-1]
         lines = [
             section_header("[01]", "SIGNAL 리스크 / 포지션", "시장모드 / 위험신호 / 포트 교체"),
-            "[POINT] 최신 판단",
+            "[A] 최신 판단",
             metric_line("시장모드", latest.get("Mode", "-").replace("_MODE", "")),
             metric_line("포지션", latest.get("Position_Level", "-")),
             metric_line("주식/현금", f"{latest.get('Recommended_Stock_Position', '-')} / {latest.get('Recommended_Cash_Position', '-')}"),
             metric_line("위험신호", latest.get("Signal_Count", "-")),
             "",
-            "[WEEK] 월~금 변화",
+            "[B] 월~금 포지션 흐름",
         ]
         positions = [r.get("Position_Level", "-") for r in rows]
         lines.append(bullet(f"포지션 흐름: {' -> '.join(positions)}"))
+        lines.append("  날짜   모드    위험  포지션       매수")
         for row in rows:
             day = datetime.fromisoformat(row["Date"]).strftime("%m-%d")
             lines.append(
-                bullet(
-                    f"{day} | {row.get('Mode', '-').replace('_MODE', '')} | 위험 {row.get('Signal_Count', '-')} | "
-                    f"{row.get('Position_Level', '-')} | 주식 {row.get('Recommended_Stock_Position', '-')} | "
-                    f"현금 {row.get('Recommended_Cash_Position', '-')} | 매수 {row.get('Buy_Count', '-')}"
-                )
+                f"  {day}  {row.get('Mode', '-').replace('_MODE', ''):<6}  {row.get('Signal_Count', '-'):>2}   "
+                f"{row.get('Position_Level', '-')}   {row.get('Buy_Count', '-')}"
             )
         lines.extend(
             [
                 "",
-                "[PORT] 포트폴리오 변화",
-                bullet(f"섹터 구성: {latest.get('Portfolio_Sectors', '-')}"),
-                bullet(f"포트 후보: {latest.get('Portfolio_Candidates', '-')}"),
-                bullet(f"교체 예상: {latest.get('Portfolio_Replacement', '-')}"),
+                "[C] 포트폴리오 변화",
+                "- 섹터 구성",
+                *detail_lines(latest.get("Portfolio_Sectors", "-"), 10),
+                "- 포트 후보",
+                f"  - {names_from_candidates(latest.get('Portfolio_Candidates', '-'), 8)}",
+                "- 교체 예상",
+                f"  - {names_from_candidates(latest.get('Portfolio_Replacement', '-'), 8)}",
             ]
         )
         watch = [
@@ -213,16 +313,19 @@ def build_signal_section(start: date, end: date) -> tuple[str, list[str]]:
     latest = latest_signal_fallback()
     lines = [
         section_header("[01]", "SIGNAL 리스크 / 포지션", "시장모드 / 위험신호 / 포트 교체"),
-        "[POINT] 최신 SIGNAL 기준 요약",
+        "[A] 최신 SIGNAL 기준 요약",
         metric_line("시장모드", latest.get("Mode", "-")),
         metric_line("포지션", latest.get("Position_Level", "-")),
         metric_line("주식/현금", f"{latest.get('Recommended_Stock_Position', '-')} / {latest.get('Recommended_Cash_Position', '-')}"),
         metric_line("위험신호", latest.get("Signal_Count", "-")),
         "",
-        "[PORT] 포트폴리오 변화",
-        bullet(f"섹터 구성: {latest.get('Portfolio_Sectors', '-')}"),
-        bullet(f"포트 후보: {latest.get('Portfolio_Candidates', '-')}"),
-        bullet(f"교체 예상: {latest.get('Portfolio_Replacement', '-')}"),
+        "[B] 포트폴리오 변화",
+        "- 섹터 구성",
+        *detail_lines(latest.get("Portfolio_Sectors", "-"), 10),
+        "- 포트 후보",
+        f"  - {names_from_candidates(latest.get('Portfolio_Candidates', '-'), 8)}",
+        "- 교체 예상",
+        f"  - {names_from_candidates(latest.get('Portfolio_Replacement', '-'), 8)}",
     ]
     return "\n".join(lines), [latest.get("Portfolio_Candidates", "").split("(")[0]]
 
@@ -263,10 +366,10 @@ def build_etf_rs_section(start: date, end: date) -> tuple[str, list[str]]:
 
     lines = [
         section_header("[02]", "ETF RS 상대강도", "월~금 TOP3 / 금요일 TOP5 / 순위변화"),
-        "[WEEK] 월~금 주도 ETF",
+        "[A] 월~금 주도 ETF",
         *daily_top3,
         "",
-        "[TOP5] 금요일 TOP5",
+        "[B] 금요일 TOP5",
         *friday_rows,
     ]
     return "\n".join(lines), final_names
@@ -315,11 +418,14 @@ def build_stocktrend_section(start: date, end: date) -> tuple[str, list[str]]:
 
     lines = [
         section_header("[03]", "주식트렌드", "Boom Score / 강관심 섹터 / 확산 흐름"),
-        "[WEEK] 월~금 주도 섹터",
+        "[A] 월~금 주도 섹터",
         *daily_top3,
         "",
-        "[TOP5] 금요일 TOP5",
+        "[B] 금요일 TOP5",
         *friday_rows,
+        "",
+        "[C] 주도 섹터 실제 종목",
+        *top_stock_lines_by_sector(final_names[:3], end),
     ]
     return "\n".join(lines), final_names
 
@@ -377,10 +483,10 @@ def build_etf_ma_section(start: date, end: date) -> tuple[str, list[str]]:
 
     lines = [
         section_header("[04]", "ETF 20일선", "5/10/20일선 / 정배열 / 관심후보"),
-        "[WEEK] 월~금 MA 후보",
+        "[A] 월~금 MA 후보",
         *daily_top3,
         "",
-        "[TOP5] 금요일 TOP5",
+        "[B] 금요일 TOP5",
         *friday_rows,
     ]
     return "\n".join(lines), final_names
@@ -397,13 +503,35 @@ def build_message() -> str:
     watch = [name for name, _count in watch_counter.most_common(8) if name and name != "-"]
     summary = [
         section_header("[05]", "전체 종합 판단", "다음 주 관찰 우선순위"),
-        "[POINT] 핵심 체크",
+        "[A] 핵심 체크",
         bullet("SIGNAL 포지션을 기준으로 주식/현금 비중을 먼저 정합니다."),
         bullet("ETF RS 상위와 ETF 20일선 정배열이 겹치는 후보를 우선 관찰합니다."),
         bullet("주식트렌드 강관심 섹터가 RS/MA 후보와 연결되면 우선순위를 올립니다."),
         bullet("교체 예상 종목은 RS 약화와 낙폭확대가 이어지는지 확인합니다."),
         "",
-        "[WATCH] 다음 주 우선 관찰",
+        "[B] 다음 주 전략",
+        "- 기본 포지션",
+        "  - SIGNAL이 공격/최상위 공격이면 주식 우위 관점 유지",
+        "  - 단, 신규 진입은 추격보다 눌림 후 재상승 확인",
+        "  - 현금은 SIGNAL 권장 범위 안에서 최소 방어자금 유지",
+        "- 1차 후보",
+        "  - ETF RS TOP권과 ETF 20일선 정배열이 동시에 잡히는 후보",
+        "  - 주간 내내 TOP3를 유지한 후보를 우선 순위로 둠",
+        "- 2차 후보",
+        "  - 주식트렌드 강관심 섹터 중 후반부 순위가 상승한 섹터",
+        "  - 금요일 TOP5에 남아 있고 거래 증가가 동반된 섹터",
+        "- 진입 체크",
+        "  - 5일선/10일선/20일선 위 유지",
+        "  - RS 순위 하락 없이 유지 또는 상승",
+        "  - 거래대금 증가가 하루짜리 급등이 아닌지 확인",
+        "- 교체 체크",
+        "  - SIGNAL 교체 예상 종목은 반등 실패 시 비중 축소 후보",
+        "  - RS 약화, 20일선 이탈, 낙폭확대가 겹치면 우선 교체",
+        "- 리스크 체크",
+        "  - 위험신호가 2개 이상으로 늘면 신규 매수 축소",
+        "  - 포지션 단계가 중립 이하로 내려가면 현금비중 확대",
+        "",
+        "[C] 다음 주 우선 관찰",
         compact_list(watch, 8),
     ]
     return "\n\n".join(
