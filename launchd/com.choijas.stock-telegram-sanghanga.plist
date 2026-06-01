@@ -7,11 +7,11 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/choijas/Documents/Codex/2026-05-29/15/stock_telegram-bot-work/scripts/dispatch_sanghanga_local.sh</string>
+    <string>/Users/choijas/stock_telegram_bot_local/scripts/dispatch_sanghanga_local.sh</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/choijas/Documents/Codex/2026-05-29/15/stock_telegram-bot-work</string>
+  <string>/Users/choijas/stock_telegram_bot_local</string>
 
   <key>StartCalendarInterval</key>
   <array>
@@ -38,9 +38,9 @@
   </array>
 
   <key>StandardOutPath</key>
-  <string>/Users/choijas/Documents/Codex/2026-05-29/15/stock_telegram-bot-work/logs/launchd-sanghanga.log</string>
+  <string>/Users/choijas/stock_telegram_bot_local/logs/launchd-sanghanga.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/choijas/Documents/Codex/2026-05-29/15/stock_telegram-bot-work/logs/launchd-sanghanga.err.log</string>
+  <string>/Users/choijas/stock_telegram_bot_local/logs/launchd-sanghanga.err.log</string>
 </dict>
 </plist>

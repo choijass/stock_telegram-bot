@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="/Users/choijas/Documents/Codex/2026-05-29/15/stock_telegram-bot-work"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 ENV_FILE="${SANGHANGA_ENV_FILE:-$REPO_DIR/.sanghanga.env}"
 
 cd "$REPO_DIR"
