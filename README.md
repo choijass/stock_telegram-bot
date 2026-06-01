@@ -47,7 +47,7 @@ TELEGRAM_CHAT_ID
 ## Telegram News Collector
 
 `telegram_news_collector.py` runs the Telegram news collection workflow and is scheduled by
-`.github/workflows/telegram-news-collector.yml` on weekdays at 08:50, 12:20, and 15:40 KST.
+`.github/workflows/telegram-news-collector.yml` on weekdays at 10:00, 12:00, 14:00, and 15:30 KST.
 
 Required repository secrets:
 

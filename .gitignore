@@ -6,6 +6,8 @@ __pycache__/
 .env
 .sanghanga.env
 google-service-account.json
+*.session
+*.session-journal
 logs/
 results_test/
 results_signal_test/
