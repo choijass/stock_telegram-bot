@@ -4,6 +4,8 @@ __pycache__/
 .venv/
 .DS_Store
 .env
+.sanghanga.env
 google-service-account.json
+logs/
 results_test/
 results_signal_test/
