@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-REPO_DIR="/Users/choijas/Documents/stock_telegram-bot"
+REPO_DIR="/Users/choijas/stock_telegram-bot"
 cd "${REPO_DIR}"
 
 mkdir -p logs results .pycache_tmp
