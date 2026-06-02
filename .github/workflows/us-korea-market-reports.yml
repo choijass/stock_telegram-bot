@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install requests
+      - name: Install dependencies
         run: python -m pip install requests pandas_market_calendars
 
       - name: Check NYSE trading day
@@ -51,6 +51,10 @@ jobs:
 
           print(f"NYSE date: {ny_date}, should_send={should_send}")
           PY
+
+      - name: Generate latest reports
+        if: github.event_name == 'workflow_dispatch' || steps.market.outputs.should_send == 'true'
+        run: python scripts/generate_us_korea_market_reports.py
 
       - name: Send US market report
         if: github.event_name == 'workflow_dispatch' || steps.market.outputs.should_send == 'true'
