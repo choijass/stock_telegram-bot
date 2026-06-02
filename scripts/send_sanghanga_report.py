@@ -5,6 +5,7 @@ import re
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -111,6 +112,11 @@ def clean_text(value: str) -> str:
     return value.strip()
 
 
+def shorten(value: str, limit: int = 64) -> str:
+    value = clean_text(value)
+    return value if len(value) <= limit else value[: limit - 1].rstrip() + "…"
+
+
 def fetch_rise_page(sosok: int) -> list[dict]:
     url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}"
     response_text = http_get_text(url, encoding="euc-kr")
@@ -159,6 +165,83 @@ def http_get_text(url: str, encoding: str) -> str:
         return response.read().decode(encoding, errors="replace")
 
 
+def fetch_stock_news(name: str) -> dict:
+    compact_name = re.sub(r"\s+", "", name)
+
+    for query_text in (f"{name} 특징주", f"{name} 주가 급등"):
+        query = quote(query_text)
+        url = f"https://search.naver.com/search.naver?where=news&query={query}"
+
+        try:
+            text = http_get_text(url, encoding="utf-8")
+        except Exception:
+            continue
+
+        matches = re.findall(
+            r'<a[^>]+class="news_tit"[^>]+href="([^"]+)"[^>]+title="([^"]+)"',
+            text,
+            flags=re.S,
+        )
+        if not matches:
+            matches = [
+                (link, clean_text(title))
+                for link, title in re.findall(
+                    r'<a[^>]+href="([^"]+)"[^>]*>\s*<span[^>]+sds-comps-text-type-headline1[^>]*>(.*?)</span>',
+                    text,
+                    flags=re.S,
+                )
+            ]
+
+        for link, title in matches:
+            title = clean_text(title)
+            compact_title = re.sub(r"\s+", "", title)
+            if compact_name not in compact_title:
+                continue
+            news = normalize_news_title(title)
+            feature = make_feature_from_title(name, news)
+            return {
+                "feature": feature,
+                "news": shorten(news, 72),
+                "link": html.unescape(link),
+                "related": infer_related_from_title(news),
+            }
+
+    return {}
+
+
+def normalize_news_title(title: str) -> str:
+    title = clean_text(title)
+    title = re.sub(r"\[\s*[^]]*특징주[^]]*\]\s*", "", title)
+    title = re.sub(r"\s+([,，])", r"\1", title)
+    title = re.sub(r"\s+", " ", title)
+    return title.strip(" -·|")
+
+
+def make_feature_from_title(name: str, title: str) -> str:
+    feature = normalize_news_title(title)
+    feature = re.sub(rf"^{re.escape(name)}\s*[,，]?\s*", "", feature)
+    feature = feature.strip(" ,，-·|")
+    return shorten(feature or title)
+
+
+def infer_related_from_title(title: str) -> str:
+    title = clean_text(title)
+    theme_map = [
+        (("퓨리오사", "NPU", "AI반도체"), "TS인베스트먼트, DSC인베스트먼트, LB인베스트먼트, 나우IB, 포바이포, 엑스페릭스"),
+        (("젠슨", "엔비디아", "피지컬AI"), "LG전자, LG씨엔에스, LG이노텍, NAVER, 현대차, 현대모비스"),
+        (("AI", "인공지능", "에이전틱"), "오브젠, 플리토, 삼성SDS, NAVER, LG씨엔에스"),
+        (("반도체", "HBM", "기판", "FC-BGA"), "삼성전자, SK하이닉스, 삼성전기, LG이노텍, 한미반도체"),
+        (("로봇", "자율주행"), "현대차, 현대모비스, 로보티즈, 로보스타, LG전자"),
+        (("우선주", "품절주"), "우선주 테마, 저유동성 종목"),
+        (("2차전지", "배터리", "리튬"), "LG에너지솔루션, 에코프로, 포스코퓨처엠, 금양"),
+        (("바이오", "제약", "임상"), "바이오·제약주"),
+    ]
+    for keys, related in theme_map:
+        if any(key in title for key in keys):
+            return related
+    return "동일 테마/업종 확인 필요"
+
+
 def load_seen() -> set[str]:
     if not STATE_PATH.exists():
         return set()
@@ -193,13 +276,15 @@ def get_rows() -> list[dict]:
 
 def enrich(row: dict, seen: set[str]) -> dict:
     meta = NEWS_MAP.get(row["name"], {})
+    if not meta:
+        meta = fetch_stock_news(row["name"])
     title = row["name"] + (" [신규진입]" if row["code"] not in seen else "")
     return {
         **row,
         "title": title,
         "status": "상한가" if row["rate"] >= 29.5 else "장중 15% 이상",
-        "news": meta.get("news", "장중 15% 이상 급등"),
-        "feature": meta.get("feature", "장중 15% 이상 수급 유입"),
+        "news": meta.get("news", f"{row['name']} 장중 15% 이상 급등"),
+        "feature": meta.get("feature", f"{row['name']} 장중 15% 이상 급등"),
         "link": meta.get("link", f"https://finance.naver.com/item/main.naver?code={row['code']}"),
         "related": meta.get("related", "동일 테마/업종 확인 필요"),
         "importance": meta.get("importance", "🟨 ★★"),
