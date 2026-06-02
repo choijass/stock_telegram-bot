@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 import os
+import json
+import re
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -18,6 +20,7 @@ OUTPUT_DIR = Path("results")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_REQUIRED = os.getenv("TELEGRAM_REQUIRED", "false").lower() in {"1", "true", "yes", "y"}
+ENTRY_STATE_PATH = OUTPUT_DIR / "etf_momentum_entry_state.json"
 
 UNIVERSE = {
     "005930.KS": "삼성전자",
@@ -71,6 +74,41 @@ UNIVERSE = {
 
 BENCHMARK = "069500.KS"
 
+ETF_HOLDINGS = {
+    "266360.KS": [
+        ("035420", "NAVER", 27.64),
+        ("036570", "NC", 9.95),
+        ("035720", "카카오", 16.53),
+        ("251270", "넷마블", 2.58),
+        ("030000", "제일기획", 2.53),
+    ],
+    "300950.KS": [
+        ("036570", "NC", 28.99),
+        ("192080", "더블유게임즈", 5.11),
+        ("251270", "넷마블", 9.82),
+        ("462870", "시프트업", 7.08),
+        ("095660", "네오위즈", 1.60),
+    ],
+    "462010.KS": [
+        ("020150", "롯데에너지머티리얼즈", 0.95),
+        ("051910", "LG화학", 11.55),
+        ("066970", "엘앤에프", 2.90),
+        ("003670", "포스코퓨처엠", 20.84),
+        ("011790", "SKC", 2.62),
+    ],
+    "157490.KS": [
+        ("064400", "LG씨엔에스", 8.77),
+        ("018260", "삼성에스디에스", 17.40),
+        ("035420", "NAVER", 23.39),
+        ("036570", "NC", 6.53),
+        ("022100", "포스코DX", 2.45),
+    ],
+}
+
+ETF_ALIASES = {
+    "462010.KS": "TIGER 2차전지소재Fn",
+}
+
 
 def signed(value: float | int, digits: int = 0) -> str:
     if pd.isna(value):
@@ -78,6 +116,158 @@ def signed(value: float | int, digits: int = 0) -> str:
     if digits == 0:
         return f"{int(value):+d}"
     return f"{float(value):+.{digits}f}"
+
+
+def clean_html_text(value: str) -> str:
+    text = re.sub(r"<.*?>", "", value)
+    text = text.replace("&nbsp;", "").replace("\xa0", "").strip()
+    return text
+
+
+def to_float(value: object, default: float = math.nan) -> float:
+    try:
+        text = str(value).replace(",", "").replace("%", "").strip()
+        if text in {"", "-", "nan", "None"}:
+            return default
+        return float(text)
+    except Exception:
+        return default
+
+
+def fmt_weight(value: float) -> str:
+    text = f"{value:.2f}".rstrip("0").rstrip(".")
+    return f"{text}%"
+
+
+def stock_code_suffix(code: str) -> str:
+    return code[-6:]
+
+
+def load_entry_state() -> dict:
+    if not ENTRY_STATE_PATH.exists():
+        return {"a_entries": {}}
+    try:
+        return json.loads(ENTRY_STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {"a_entries": {}}
+
+
+def save_entry_state(state: dict) -> None:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    ENTRY_STATE_PATH.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def fetch_naver_daily(code: str, min_rows: int = 25) -> pd.DataFrame:
+    rows = []
+    session = requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": f"https://finance.naver.com/item/main.naver?code={code}",
+    }
+    for page in range(1, 8):
+        url = f"https://finance.naver.com/item/sise_day.naver?code={code}&page={page}"
+        response = session.get(url, headers=headers, timeout=20)
+        response.encoding = "euc-kr"
+        for row_html in re.findall(r"<tr[^>]*>(.*?)</tr>", response.text, flags=re.S | re.I):
+            cells = [clean_html_text(x) for x in re.findall(r"<td[^>]*>(.*?)</td>", row_html, flags=re.S | re.I)]
+            cells = [x for x in cells if x]
+            if len(cells) < 7 or not re.match(r"\d{4}\.\d{2}\.\d{2}", cells[0]):
+                continue
+            rows.append(
+                {
+                    "date": cells[0],
+                    "close": to_float(cells[1]),
+                    "open": to_float(cells[3]),
+                    "high": to_float(cells[4]),
+                    "low": to_float(cells[5]),
+                    "volume": to_float(cells[6], 0),
+                }
+            )
+        if len(rows) >= min_rows:
+            break
+
+    df = pd.DataFrame(rows).dropna(subset=["close"])
+    if df.empty:
+        raise RuntimeError(f"네이버 일봉 데이터 없음: {code}")
+    return df.drop_duplicates("date").sort_values("date").reset_index(drop=True)
+
+
+def build_stock_snapshot(code: str) -> dict:
+    df = fetch_naver_daily(code)
+    latest = df.iloc[-1]
+    close = float(latest["close"])
+    ret5 = math.nan
+    if len(df) >= 6:
+        base = float(df["close"].iloc[-6])
+        if base:
+            ret5 = (close / base - 1) * 100
+
+    vol_ratio = math.nan
+    if len(df) >= 20:
+        vol20 = df["volume"].tail(20).mean()
+        vol5 = df["volume"].tail(5).mean()
+        if vol20:
+            vol_ratio = vol5 / vol20
+
+    ma20 = df["close"].tail(20).mean() if len(df) >= 20 else math.nan
+    ma_pass = bool(pd.notna(ma20) and close > float(ma20))
+    return {
+        "code": code,
+        "close": close,
+        "ret5": ret5,
+        "vol_ratio": vol_ratio,
+        "ma20": ma20,
+        "ma_pass": ma_pass,
+    }
+
+
+def leader_mark(snapshot: dict) -> str:
+    ret5 = snapshot.get("ret5", math.nan)
+    vol_ratio = snapshot.get("vol_ratio", math.nan)
+    ma_pass = bool(snapshot.get("ma_pass", False))
+    if ma_pass and pd.notna(ret5) and ret5 >= 8:
+        return "★★"
+    if ma_pass and pd.notna(vol_ratio) and vol_ratio >= 1.5:
+        return "★★"
+    if pd.notna(ret5) and ret5 >= 15 and pd.notna(vol_ratio) and vol_ratio >= 1.2:
+        return "★★"
+    if ma_pass or (pd.notna(ret5) and ret5 >= 2) or (pd.notna(vol_ratio) and vol_ratio >= 1.5):
+        return "★"
+    return "-"
+
+
+def format_leader_stock_line(rank: int, name: str, code: str, weight: float, snapshot: dict) -> list[str]:
+    mark = leader_mark(snapshot)
+    ret5 = snapshot.get("ret5", math.nan)
+    vol_ratio = snapshot.get("vol_ratio", math.nan)
+    ma_text = "✅" if snapshot.get("ma_pass") else "❌"
+    ret_text = "-" if pd.isna(ret5) else f"{ret5:+.1f}%"
+    vol_text = "-" if pd.isna(vol_ratio) else f"{vol_ratio:.1f}x"
+    return [
+        f"{rank}. {mark} {name} ({code})",
+        f"   비중 {fmt_weight(weight)} | 5일 {ret_text} | 거래량 {vol_text} | MA {ma_text}",
+    ]
+
+
+def format_entry_leaders(title: str, etf_tickers: list[str], snapshot_cache: dict[str, dict]) -> list[str]:
+    lines = [title]
+    shown = False
+    for ticker in etf_tickers:
+        holdings = ETF_HOLDINGS.get(ticker)
+        if not holdings:
+            continue
+        shown = True
+        lines.append(f"🔹 {ETF_ALIASES.get(ticker, UNIVERSE.get(ticker, ticker))}")
+        for idx, (code, name, weight) in enumerate(holdings[:5], start=1):
+            if code not in snapshot_cache:
+                snapshot_cache[code] = build_stock_snapshot(code)
+            lines.extend(format_leader_stock_line(idx, name, code, weight, snapshot_cache[code]))
+    if not shown:
+        lines.append("- 없음")
+    return lines
 
 
 def pct_rank(s: pd.Series) -> pd.Series:
@@ -293,10 +483,18 @@ def build_report() -> str:
         for ticker in prev_top20_tickers - top20_tickers
     ]
 
-    new_entries = [
-        row["name"]
+    new_entry_tickers = [
+        row["ticker"]
         for _, row in cur[cur["ticker"].isin(top20_tickers - prev_top20_tickers)].head(5).iterrows()
     ]
+    state = load_entry_state()
+    previous_a_entries = set(state.get("a_entries", {}).keys())
+    b_type_tickers = [
+        ticker
+        for ticker in cur.head(20)["ticker"].tolist()
+        if ticker in previous_a_entries and ticker not in new_entry_tickers
+    ]
+    snapshot_cache: dict[str, dict] = {}
 
     sections = [
         [f"📊 [오늘의 ETF 모멘텀 리포트] ({latest_date})"],
@@ -326,14 +524,51 @@ def build_report() -> str:
             "score_short",
         ),
         move_section("📈 [단기] 순위 상승이 큰 ETF", short_risers),
-        ["🔥 [A타입] 신규 진입 대장주"]
-        + ([f"🔹 {name}" for name in new_entries] if new_entries else ["- 없음"]),
-        ["📈 [B타입] 진입 후 상승 유지", "- 없음"],
+        format_entry_leaders("🔥 [A타입] 신규 진입 대장주", new_entry_tickers, snapshot_cache),
+        format_entry_leaders("📈 [B타입] 진입 후 상승 유지", b_type_tickers, snapshot_cache),
         ["※ 상세 분석 결과는 로컬 CSV 파일로 저장되었습니다."],
     ]
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     cur.to_csv(OUTPUT_DIR / f"etf_momentum_today_scores_{latest_date}.csv", index=False, encoding="utf-8-sig")
+    leader_rows = []
+    for ticker in sorted(set(new_entry_tickers + b_type_tickers)):
+        for code, name, weight in ETF_HOLDINGS.get(ticker, []):
+            snapshot = snapshot_cache.get(code)
+            if not snapshot:
+                continue
+            leader_rows.append(
+                {
+                    "date": latest_date,
+                    "type": "A" if ticker in new_entry_tickers else "B",
+                    "etf_ticker": ticker,
+                    "etf_name": ETF_ALIASES.get(ticker, UNIVERSE.get(ticker, ticker)),
+                    "stock_code": code,
+                    "stock_name": name,
+                    "weight": weight,
+                    "ret5": snapshot.get("ret5"),
+                    "vol_ratio": snapshot.get("vol_ratio"),
+                    "ma20": snapshot.get("ma20"),
+                    "ma_pass": snapshot.get("ma_pass"),
+                    "mark": leader_mark(snapshot),
+                }
+            )
+    if leader_rows:
+        pd.DataFrame(leader_rows).to_csv(
+            OUTPUT_DIR / f"etf_momentum_entry_leaders_{latest_date}.csv",
+            index=False,
+            encoding="utf-8-sig",
+        )
+    state["last_date"] = latest_date
+    state["a_entries"] = {
+        ticker: {
+            "date": latest_date,
+            "name": ETF_ALIASES.get(ticker, UNIVERSE.get(ticker, ticker)),
+        }
+        for ticker in sorted(set(previous_a_entries).union(new_entry_tickers))
+        if ticker in top20_tickers or ticker in new_entry_tickers
+    }
+    save_entry_state(state)
     report = "\n\n".join("\n".join(s) for s in sections)
     (OUTPUT_DIR / f"etf_momentum_today_report_{latest_date}.txt").write_text(report, encoding="utf-8")
     return report
