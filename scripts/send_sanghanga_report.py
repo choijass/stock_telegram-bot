@@ -19,60 +19,70 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 NEWS_MAP = {
     "TS인베스트먼트": {
+        "feature": "퓨리오사AI 투자 VC 관련주",
         "news": "퓨리오사AI 8000억 투자 수혜",
         "link": "https://www.mt.co.kr/amp/stock/2026/05/29/2026052909223359810",
         "related": "DSC인베스트먼트, LB인베스트먼트, 나우IB, 포바이포, 엑스페릭스",
         "importance": "🟥 ★★★★",
     },
     "LG전자": {
+        "feature": "젠슨 황 방한·LG AI 협력 기대",
         "news": "젠슨 황 방한 기대에 LG그룹주 급등",
         "link": "https://stock.mk.co.kr/news/view/1096124",
         "related": "LG씨엔에스, LG이노텍, NAVER, 현대차, 현대모비스",
         "importance": "🟥 ★★★★",
     },
     "LG씨엔에스": {
+        "feature": "LG그룹 AI·에이전틱 AI 수혜",
         "news": "LG AI 협력 기대감 부각",
         "link": "https://stock.mk.co.kr/news/view/1096124",
         "related": "LG전자, LG이노텍, 삼성SDS, 오브젠",
         "importance": "🟥 ★★★★",
     },
     "오브젠": {
+        "feature": "AI 플랫폼 기술력 부각",
         "news": "AI 플랫폼주 동반 강세",
         "link": "https://www.newsprime.co.kr/news/article/?no=735093",
         "related": "플리토, 삼성SDS, NAVER, LG씨엔에스",
         "importance": "🟨 ★★",
     },
     "플리토": {
+        "feature": "AI 통번역 솔루션 기대",
         "news": "AI 통번역 솔루션 기대",
         "link": "https://www.bodnara.co.kr/bbs/article.html?num=212831",
         "related": "오브젠, NAVER, 삼성SDS",
         "importance": "🟨 ★★",
     },
     "누리플랜": {
+        "feature": "저시총 단기 수급",
         "news": "급등주 상위 종목 포함",
         "link": "https://alphasquare.co.kr/home/market-summary?code=006360",
         "related": "저시총 테마주, 단기 수급주",
         "importance": "⬜ ★",
     },
     "서울식품우": {
+        "feature": "저유동성 우선주 수급",
         "news": "우선주 수급성 급등",
         "link": "https://finance.naver.com/item/main.naver?code=004415",
         "related": "서울식품, 우선주 테마",
         "importance": "⬜ ★",
     },
     "LG이노텍": {
+        "feature": "AI 서버 기판 성장 기대",
         "news": "AI 서버 기판 성장 기대",
         "link": "https://www.edaily.co.kr/News/Read?mediaCodeNo=257&newsId=02709286645453840",
         "related": "삼성전기, LG전자, FC-BGA 관련주",
         "importance": "🟥 ★★★★",
     },
     "포바이포": {
+        "feature": "퓨리오사AI 협력 관련주",
         "news": "퓨리오사AI 협력주 부각",
         "link": "https://www.newsway.co.kr/news/view?ud=2026052910005307757",
         "related": "TS인베스트먼트, DSC인베스트먼트, 엑스페릭스",
         "importance": "🟥 ★★★★",
     },
     "삼성전기": {
+        "feature": "AI 반도체 부품·기판주",
         "news": "AI 반도체 부품주 확산",
         "link": "https://www.hani.co.kr/arti/economy/finance/1261074.html",
         "related": "LG이노텍, 삼성전자, 반도체 기판주",
@@ -189,6 +199,7 @@ def enrich(row: dict, seen: set[str]) -> dict:
         "title": title,
         "status": "상한가" if row["rate"] >= 29.5 else "장중 15% 이상",
         "news": meta.get("news", "장중 15% 이상 급등"),
+        "feature": meta.get("feature", "장중 15% 이상 수급 유입"),
         "link": meta.get("link", f"https://finance.naver.com/item/main.naver?code={row['code']}"),
         "related": meta.get("related", "동일 테마/업종 확인 필요"),
         "importance": meta.get("importance", "🟨 ★★"),
@@ -253,6 +264,7 @@ def format_detail_list(rows: list[dict]) -> list[str]:
             [
                 f"{idx}. {row['title']}",
                 f"구분: {row['status']} / 등락률: +{row['rate']:.2f}% / 시총: {row['market_cap']}",
+                f"특징주: {row['feature']}",
                 f"뉴스: {row['news']}",
                 f"링크: {row['link']}",
                 f"관련주: {row['related']}",
@@ -274,6 +286,7 @@ def version2(rows: list[dict]) -> str:
         lines.extend(
             [
                 f"{idx}. {row['title']}: {row['status']} / +{row['rate']:.2f}%",
+                f"특징주: {row['feature']}",
                 f"뉴스: {row['news']}",
                 f"링크: {row['link']}",
                 f"관련주: {row['related']}",
