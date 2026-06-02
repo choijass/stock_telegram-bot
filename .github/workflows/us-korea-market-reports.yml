@@ -3,8 +3,8 @@ name: US Korea Market Reports
 on:
   workflow_dispatch:
   schedule:
-    # 21:00 UTC = 06:00 KST. Runs Tue-Sat KST after regular US market days.
-    - cron: "0 21 * * 1-5"
+    # 22:00 UTC = 07:00 KST. Runs Tue-Sat KST after regular US market days.
+    - cron: "0 22 * * 1-5"
 
 permissions:
   contents: read
