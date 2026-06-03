@@ -59,6 +59,8 @@ def main() -> None:
             },
             timeout=30,
         )
+        if response.status_code >= 400:
+            print(f"telegram send failed: HTTP {response.status_code} {response.text}")
         response.raise_for_status()
         data = response.json()
         if not data.get("ok"):
