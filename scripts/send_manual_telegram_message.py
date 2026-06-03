@@ -40,8 +40,10 @@ def visible_len(text: str) -> int:
 
 
 def main() -> None:
-    token = os.environ["TELEGRAM_BOT_TOKEN"].strip()
-    chat_id = os.environ["TELEGRAM_CHAT_ID"].strip()
+    token = (os.getenv("SEND_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    chat_id = (os.getenv("SEND_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID") or "").strip()
+    if not token or not chat_id:
+        raise RuntimeError("SEND/TELEGRAM bot token or chat id is missing.")
     text = MESSAGE_PATH.read_text(encoding="utf-8")
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
