@@ -7,7 +7,7 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/choijas/Library/Application Support/stock-telegram-bot/dispatch_etf_momentum_workflow.sh</string>
+    <string>/Users/choijas/Library/Application Support/stock-telegram-bot/run_etf_momentum_local.sh</string>
   </array>
 
   <key>StartCalendarInterval</key>
