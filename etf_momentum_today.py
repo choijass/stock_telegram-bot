@@ -196,7 +196,18 @@ def fetch_naver_daily(code: str, min_rows: int = 25) -> pd.DataFrame:
 
 
 def build_stock_snapshot(code: str) -> dict:
-    df = fetch_naver_daily(code)
+    try:
+        df = fetch_naver_daily(code)
+    except Exception as exc:
+        print(f"[WARN] 네이버 종목 데이터 조회 실패: {code} {exc}")
+        return {
+            "code": code,
+            "close": math.nan,
+            "ret5": math.nan,
+            "vol_ratio": math.nan,
+            "ma20": math.nan,
+            "ma_pass": False,
+        }
     latest = df.iloc[-1]
     close = float(latest["close"])
     ret5 = math.nan
@@ -268,6 +279,34 @@ def format_entry_leaders(title: str, etf_tickers: list[str], snapshot_cache: dic
     if not shown:
         lines.append("- 없음")
     return lines
+
+
+def split_telegram_message(text: str, limit: int = 3500) -> list[str]:
+    chunks: list[str] = []
+    current = ""
+    for section in text.split("\n\n"):
+        piece = section if not current else f"\n\n{section}"
+        if len(current) + len(piece) <= limit:
+            current += piece
+            continue
+        if current:
+            chunks.append(current)
+        if len(section) <= limit:
+            current = section
+            continue
+        lines = section.splitlines()
+        current = ""
+        for line in lines:
+            piece = line if not current else f"\n{line}"
+            if len(current) + len(piece) <= limit:
+                current += piece
+            else:
+                if current:
+                    chunks.append(current)
+                current = line
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def pct_rank(s: pd.Series) -> pd.Series:
@@ -583,18 +622,21 @@ def send_telegram_message(report: str) -> None:
         return
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    response = requests.post(
-        url,
-        data={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": report,
-            "disable_web_page_preview": "true",
-        },
-        timeout=60,
-    )
-    if not response.ok:
-        raise RuntimeError(f"Telegram 메시지 발송 실패: {response.status_code} {response.text}")
-    print("[OK] Telegram ETF 모멘텀 리포트 발송 완료")
+    chunks = split_telegram_message(report)
+    for idx, chunk in enumerate(chunks, start=1):
+        text = chunk if len(chunks) == 1 else f"{chunk}\n\n({idx}/{len(chunks)})"
+        response = requests.post(
+            url,
+            data={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": text,
+                "disable_web_page_preview": "true",
+            },
+            timeout=60,
+        )
+        if not response.ok:
+            raise RuntimeError(f"Telegram 메시지 발송 실패: {response.status_code} {response.text}")
+    print(f"[OK] Telegram ETF 모멘텀 리포트 발송 완료: {len(chunks)}개 메시지")
 
 
 if __name__ == "__main__":
