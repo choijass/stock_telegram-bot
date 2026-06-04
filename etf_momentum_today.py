@@ -17,8 +17,8 @@ import yfinance as yf
 KST = ZoneInfo("Asia/Seoul")
 TODAY = datetime.now(KST).strftime("%Y-%m-%d")
 OUTPUT_DIR = Path("results")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_BOT_TOKEN = os.getenv("SEND_BOT_TOKEN", "") or os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("SEND_CHAT_ID", "") or os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_REQUIRED = os.getenv("TELEGRAM_REQUIRED", "false").lower() in {"1", "true", "yes", "y"}
 ENTRY_STATE_PATH = OUTPUT_DIR / "etf_momentum_entry_state.json"
 

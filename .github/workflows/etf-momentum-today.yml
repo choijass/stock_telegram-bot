@@ -26,6 +26,8 @@ jobs:
 
       - name: Run ETF momentum report
         env:
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          SEND_CHAT_ID: ${{ secrets.SEND_CHAT_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_REQUIRED: "true"
