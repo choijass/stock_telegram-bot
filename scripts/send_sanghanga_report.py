@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+import xml.etree.ElementTree as ET
 
 
 
@@ -17,6 +18,49 @@ STATE_PATH = Path(os.getenv("SANGHANGA_STATE_PATH", "reports/sanghanga_seen.json
 MAX_LEN = 3800
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
+
+THEME_RULES = [
+    {
+        "keys": ("퓨리오사", "NPU", "AI반도체"),
+        "line": "🟥 ★★★★ 퓨리오사AI / NPU / AI반도체 / VC투자",
+        "query": "퓨리오사AI 투자 AI반도체 일정",
+    },
+    {
+        "keys": ("젠슨", "엔비디아", "피지컬AI"),
+        "line": "🟥 ★★★★ 엔비디아 / 젠슨 황 / 피지컬AI / 로봇",
+        "query": "엔비디아 젠슨 황 피지컬AI 일정",
+    },
+    {
+        "keys": ("AI", "인공지능", "에이전틱", "통번역", "AI플랫폼"),
+        "line": "🟧 ★★★ AI / 에이전틱AI / AI플랫폼 / AI통번역",
+        "query": "AI 에이전틱AI 인공지능 일정",
+    },
+    {
+        "keys": ("반도체", "HBM", "기판", "FC-BGA"),
+        "line": "🟧 ★★★ 반도체 / HBM / FC-BGA / AI서버기판",
+        "query": "반도체 HBM AI서버기판 일정",
+    },
+    {
+        "keys": ("로봇", "자율주행", "휴머노이드"),
+        "line": "🟨 ★★ 로봇 / 자율주행 / 휴머노이드",
+        "query": "로봇 휴머노이드 자율주행 일정",
+    },
+    {
+        "keys": ("우선주", "품절주", "저시총", "단기 수급"),
+        "line": "⬜ ★ 우선주 / 품절주 / 저시총 / 단기수급",
+        "query": "우선주 품절주 급등 일정",
+    },
+    {
+        "keys": ("2차전지", "배터리", "리튬"),
+        "line": "🟨 ★★ 2차전지 / 배터리 / 리튬",
+        "query": "2차전지 배터리 리튬 일정",
+    },
+    {
+        "keys": ("바이오", "제약", "임상"),
+        "line": "🟨 ★★ 바이오 / 제약 / 임상",
+        "query": "바이오 제약 임상 일정",
+    },
+]
 
 NEWS_MAP = {
     "TS인베스트먼트": {
@@ -291,6 +335,101 @@ def enrich(row: dict, seen: set[str]) -> dict:
     }
 
 
+def row_theme_text(row: dict) -> str:
+    return " ".join(
+        clean_text(row.get(key, ""))
+        for key in ("title", "name", "news", "feature", "related")
+    )
+
+
+def active_theme_rules(rows: list[dict]) -> list[dict]:
+    scored = []
+    for rule in THEME_RULES:
+        score = 0
+        for row in rows:
+            text = row_theme_text(row)
+            if any(key in text for key in rule["keys"]):
+                score += 1
+        if score:
+            scored.append((score, rule))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [rule for _, rule in scored]
+
+
+def build_common_keyword_lines(rows: list[dict]) -> list[str]:
+    rules = active_theme_rules(rows)
+    if rules:
+        return [rule["line"] for rule in rules[:4]]
+
+    keywords = []
+    for row in rows[:8]:
+        words = re.findall(r"[가-힣A-Za-z0-9+-]{2,}", row_theme_text(row))
+        for word in words:
+            if word in {"상한가", "급등", "특징주", "관련주", "기대", "종목", "진입"}:
+                continue
+            if word not in keywords:
+                keywords.append(word)
+            if len(keywords) >= 8:
+                break
+        if len(keywords) >= 8:
+            break
+    return ["🟨 ★★ " + " / ".join(keywords[:8])] if keywords else ["- 최신 급등 테마 확인 필요"]
+
+
+def fetch_google_news(query: str, limit: int = 3) -> list[dict]:
+    url = f"https://news.google.com/rss/search?q={quote(query)}&hl=ko&gl=KR&ceid=KR:ko"
+    try:
+        text = http_get_text(url, encoding="utf-8")
+        root = ET.fromstring(text)
+    except Exception:
+        return []
+
+    items = []
+    for item in root.findall(".//item"):
+        title = clean_text(item.findtext("title", ""))
+        link = clean_text(item.findtext("link", ""))
+        pub_date = clean_text(item.findtext("pubDate", ""))
+        if not title:
+            continue
+        date_text = format_rss_date(pub_date)
+        items.append({"date": date_text, "title": shorten(title, 74), "link": link})
+        if len(items) >= limit:
+            break
+    return items
+
+
+def format_rss_date(pub_date: str) -> str:
+    if not pub_date:
+        return datetime.now(KST).strftime("%Y-%m-%d")
+    try:
+        dt = datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %Z")
+        return dt.replace(tzinfo=timezone.utc).astimezone(KST).strftime("%Y-%m-%d")
+    except Exception:
+        return datetime.now(KST).strftime("%Y-%m-%d")
+
+
+def build_news_schedule_lines(rows: list[dict]) -> list[str]:
+    rules = active_theme_rules(rows)[:3]
+    queries = [rule["query"] for rule in rules]
+    if not queries:
+        queries = [f"{row['name']} 일정 뉴스" for row in rows[:3]]
+
+    result = []
+    seen = set()
+    for query in queries:
+        for item in fetch_google_news(query, limit=2):
+            if item["title"] in seen:
+                continue
+            seen.add(item["title"])
+            suffix = f" / {item['link']}" if item.get("link") else ""
+            result.append(f"- {item['date']}: {item['title']}{suffix}")
+            if len(result) >= 4:
+                return result
+        time.sleep(0.1)
+
+    return result or ["- 최신 일정성 뉴스 자동 수집 실패: 장중 주요 뉴스 수동 확인 필요"]
+
+
 def version1(rows: list[dict]) -> str:
     now = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
     upper = [r for r in rows if r["status"] == "상한가"]
@@ -317,15 +456,10 @@ def version1(rows: list[dict]) -> str:
             ],
             "",
             "공통 키워드",
-            "🟥 ★★★★ AI / 젠슨 황 / 엔비디아 / 퓨리오사AI / 국민성장펀드 / AI반도체",
-            "🟧 ★★★ 피지컬AI / FC-BGA / AI 서버기판 / 에이전틱AI",
-            "🟨 ★★ AI통번역 / AI플랫폼",
-            "⬜ ★ 우선주 / 저시총 / 단기수급",
+            *build_common_keyword_lines(rows),
             "",
             "뉴스 일정",
-            "- 2026-05-28: 국민성장펀드, 퓨리오사AI 약 8,000억 투자 승인",
-            "- 2026-06-02~06-05: 젠슨 황, 컴퓨텍스 2026 참석 예정",
-            "- 2026-06월 초: 젠슨 황 방한 가능성, LG·네이버·현대차 등 회동 기대",
+            *build_news_schedule_lines(rows),
             "",
             "추가 급등 가능 관찰 기업",
             "1. DSC인베스트먼트: 🟥 ★★★★ 퓨리오사AI 초기 투자",
@@ -381,10 +515,7 @@ def version2(rows: list[dict]) -> str:
     lines.extend(
         [
             "핵심 키워드",
-            "🟥 ★★★★ AI / 젠슨 황 / 엔비디아 / 퓨리오사AI / 국민성장펀드",
-            "🟧 ★★★ 피지컬AI / AI 서버기판 / 에이전틱AI",
-            "🟨 ★★ AI통번역 / AI플랫폼",
-            "⬜ ★ 우선주 / 저시총 / 단기수급",
+            *build_common_keyword_lines(rows),
         ]
     )
     return "\n".join(lines).strip()
