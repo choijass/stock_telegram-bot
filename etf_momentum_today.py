@@ -17,8 +17,8 @@ import yfinance as yf
 KST = ZoneInfo("Asia/Seoul")
 TODAY = datetime.now(KST).strftime("%Y-%m-%d")
 OUTPUT_DIR = Path("results")
-TELEGRAM_BOT_TOKEN = os.getenv("SEND_BOT_TOKEN", "") or os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("SEND_CHAT_ID", "") or os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_REQUIRED = os.getenv("TELEGRAM_REQUIRED", "false").lower() in {"1", "true", "yes", "y"}
 ENTRY_STATE_PATH = OUTPUT_DIR / "etf_momentum_entry_state.json"
 
@@ -140,7 +140,7 @@ def fmt_weight(value: float) -> str:
 
 
 def stock_code_suffix(code: str) -> str:
-    return code[-6:]
+    return str(code).split(".")[0][-6:].zfill(6)
 
 
 def load_entry_state() -> dict:
@@ -196,18 +196,7 @@ def fetch_naver_daily(code: str, min_rows: int = 25) -> pd.DataFrame:
 
 
 def build_stock_snapshot(code: str) -> dict:
-    try:
-        df = fetch_naver_daily(code)
-    except Exception as exc:
-        print(f"[WARN] 네이버 종목 데이터 조회 실패: {code} {exc}")
-        return {
-            "code": code,
-            "close": math.nan,
-            "ret5": math.nan,
-            "vol_ratio": math.nan,
-            "ma20": math.nan,
-            "ma_pass": False,
-        }
+    df = fetch_naver_daily(code)
     latest = df.iloc[-1]
     close = float(latest["close"])
     ret5 = math.nan
@@ -263,50 +252,38 @@ def format_leader_stock_line(rank: int, name: str, code: str, weight: float, sna
     ]
 
 
+def holdings_for_etf(ticker: str) -> list[tuple[str, str, float]]:
+    holdings = ETF_HOLDINGS.get(ticker)
+    if holdings:
+        return holdings
+    return [(stock_code_suffix(ticker), ETF_ALIASES.get(ticker, UNIVERSE.get(ticker, ticker)), 100.0)]
+
+
+def safe_snapshot(code: str, snapshot_cache: dict[str, dict]) -> dict:
+    if code not in snapshot_cache:
+        try:
+            snapshot_cache[code] = build_stock_snapshot(code)
+        except Exception:
+            snapshot_cache[code] = {
+                "code": code,
+                "ret5": math.nan,
+                "vol_ratio": math.nan,
+                "ma20": math.nan,
+                "ma_pass": False,
+            }
+    return snapshot_cache[code]
+
+
 def format_entry_leaders(title: str, etf_tickers: list[str], snapshot_cache: dict[str, dict]) -> list[str]:
     lines = [title]
-    shown = False
+    if not etf_tickers:
+        return lines + ["- 없음"]
     for ticker in etf_tickers:
-        holdings = ETF_HOLDINGS.get(ticker)
-        if not holdings:
-            continue
-        shown = True
         lines.append(f"🔹 {ETF_ALIASES.get(ticker, UNIVERSE.get(ticker, ticker))}")
-        for idx, (code, name, weight) in enumerate(holdings[:5], start=1):
-            if code not in snapshot_cache:
-                snapshot_cache[code] = build_stock_snapshot(code)
-            lines.extend(format_leader_stock_line(idx, name, code, weight, snapshot_cache[code]))
-    if not shown:
-        lines.append("- 없음")
+        for idx, (code, name, weight) in enumerate(holdings_for_etf(ticker)[:5], start=1):
+            snapshot = safe_snapshot(code, snapshot_cache)
+            lines.extend(format_leader_stock_line(idx, name, code, weight, snapshot))
     return lines
-
-
-def split_telegram_message(text: str, limit: int = 3500) -> list[str]:
-    chunks: list[str] = []
-    current = ""
-    for section in text.split("\n\n"):
-        piece = section if not current else f"\n\n{section}"
-        if len(current) + len(piece) <= limit:
-            current += piece
-            continue
-        if current:
-            chunks.append(current)
-        if len(section) <= limit:
-            current = section
-            continue
-        lines = section.splitlines()
-        current = ""
-        for line in lines:
-            piece = line if not current else f"\n{line}"
-            if len(current) + len(piece) <= limit:
-                current += piece
-            else:
-                if current:
-                    chunks.append(current)
-                current = line
-    if current:
-        chunks.append(current)
-    return chunks
 
 
 def pct_rank(s: pd.Series) -> pd.Series:
@@ -315,22 +292,52 @@ def pct_rank(s: pd.Series) -> pd.Series:
 
 def download_panel() -> tuple[pd.DataFrame, pd.DataFrame]:
     tickers = sorted(UNIVERSE)
-    raw = yf.download(
-        tickers,
-        period="1y",
-        auto_adjust=True,
-        group_by="column",
-        progress=False,
-        threads=True,
-    )
+    raw = pd.DataFrame()
+    try:
+        raw = yf.download(
+            tickers,
+            period="1y",
+            auto_adjust=True,
+            group_by="column",
+            progress=False,
+            threads=True,
+        )
+    except Exception:
+        raw = pd.DataFrame()
+
     if raw.empty:
-        raise RuntimeError("가격 데이터를 가져오지 못했습니다.")
+        return download_panel_from_naver(tickers)
 
     close = raw["Close"].copy() if isinstance(raw.columns, pd.MultiIndex) else raw[["Close"]]
     volume = raw["Volume"].copy() if isinstance(raw.columns, pd.MultiIndex) else raw[["Volume"]]
     close = close.dropna(how="all").ffill()
     volume = volume.reindex(close.index).fillna(0)
     valid = [c for c in close.columns if close[c].notna().sum() >= 130]
+    if not valid:
+        return download_panel_from_naver(tickers)
+    return close[valid], volume[valid]
+
+
+def download_panel_from_naver(tickers: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    close_frames = {}
+    volume_frames = {}
+    for ticker in tickers:
+        code = stock_code_suffix(ticker)
+        try:
+            df = fetch_naver_daily(code, min_rows=130)
+        except Exception:
+            continue
+        idx = pd.to_datetime(df["date"], format="%Y.%m.%d")
+        close_frames[ticker] = pd.Series(df["close"].to_numpy(), index=idx)
+        volume_frames[ticker] = pd.Series(df["volume"].to_numpy(), index=idx)
+
+    if not close_frames:
+        raise RuntimeError("가격 데이터를 가져오지 못했습니다.")
+    close = pd.DataFrame(close_frames).sort_index().ffill()
+    volume = pd.DataFrame(volume_frames).reindex(close.index).fillna(0)
+    valid = [c for c in close.columns if close[c].notna().sum() >= 130]
+    if not valid:
+        raise RuntimeError("가격 데이터가 부족합니다.")
     return close[valid], volume[valid]
 
 
@@ -533,6 +540,12 @@ def build_report() -> str:
         for ticker in cur.head(20)["ticker"].tolist()
         if ticker in previous_a_entries and ticker not in new_entry_tickers
     ]
+    if not b_type_tickers and not previous_a_entries:
+        b_type_tickers = [
+            row["ticker"]
+            for _, row in cur.head(20).iterrows()
+            if row["ticker"] in prev_top20_tickers and changes.get(row["ticker"], -999) >= 0
+        ][:3]
     snapshot_cache: dict[str, dict] = {}
 
     sections = [
@@ -572,14 +585,13 @@ def build_report() -> str:
     cur.to_csv(OUTPUT_DIR / f"etf_momentum_today_scores_{latest_date}.csv", index=False, encoding="utf-8-sig")
     leader_rows = []
     for ticker in sorted(set(new_entry_tickers + b_type_tickers)):
-        for code, name, weight in ETF_HOLDINGS.get(ticker, []):
-            snapshot = snapshot_cache.get(code)
-            if not snapshot:
-                continue
+        leader_type = "A" if ticker in new_entry_tickers else "B"
+        for code, name, weight in holdings_for_etf(ticker)[:5]:
+            snapshot = snapshot_cache.get(code) or safe_snapshot(code, snapshot_cache)
             leader_rows.append(
                 {
                     "date": latest_date,
-                    "type": "A" if ticker in new_entry_tickers else "B",
+                    "type": leader_type,
                     "etf_ticker": ticker,
                     "etf_name": ETF_ALIASES.get(ticker, UNIVERSE.get(ticker, ticker)),
                     "stock_code": code,
@@ -601,7 +613,7 @@ def build_report() -> str:
     state["last_date"] = latest_date
     state["a_entries"] = {
         ticker: {
-            "date": latest_date,
+            "date": state.get("a_entries", {}).get(ticker, {}).get("date", latest_date),
             "name": ETF_ALIASES.get(ticker, UNIVERSE.get(ticker, ticker)),
         }
         for ticker in sorted(set(previous_a_entries).union(new_entry_tickers))
@@ -622,21 +634,18 @@ def send_telegram_message(report: str) -> None:
         return
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    chunks = split_telegram_message(report)
-    for idx, chunk in enumerate(chunks, start=1):
-        text = chunk if len(chunks) == 1 else f"{chunk}\n\n({idx}/{len(chunks)})"
-        response = requests.post(
-            url,
-            data={
-                "chat_id": TELEGRAM_CHAT_ID,
-                "text": text,
-                "disable_web_page_preview": "true",
-            },
-            timeout=60,
-        )
-        if not response.ok:
-            raise RuntimeError(f"Telegram 메시지 발송 실패: {response.status_code} {response.text}")
-    print(f"[OK] Telegram ETF 모멘텀 리포트 발송 완료: {len(chunks)}개 메시지")
+    response = requests.post(
+        url,
+        data={
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": report,
+            "disable_web_page_preview": "true",
+        },
+        timeout=60,
+    )
+    if not response.ok:
+        raise RuntimeError(f"Telegram 메시지 발송 실패: {response.status_code} {response.text}")
+    print("[OK] Telegram ETF 모멘텀 리포트 발송 완료")
 
 
 if __name__ == "__main__":
