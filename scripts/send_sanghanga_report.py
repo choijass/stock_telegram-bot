@@ -16,6 +16,7 @@ BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"].strip()
 CHAT_ID = os.getenv("SANGHANGA_TELEGRAM_CHAT_ID", os.getenv("TELEGRAM_CHAT_ID", "")).strip()
 STATE_PATH = Path(os.getenv("SANGHANGA_STATE_PATH", "reports/sanghanga_seen.json"))
 MAX_LEN = 3800
+ALLOW_FALLBACK_DATA = os.getenv("SANGHANGA_ALLOW_FALLBACK_DATA", "").lower() in {"1", "true", "yes", "y"}
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
@@ -311,17 +312,23 @@ def get_rows() -> list[dict]:
         rows.extend(fetch_rise_page(0))
         rows.extend(fetch_rise_page(1))
     except Exception as exc:
-        print(f"[WARN] Naver rise fetch failed, fallback used: {exc}")
-        rows = FALLBACK_ROWS[:]
+        if ALLOW_FALLBACK_DATA:
+            print(f"[WARN] Naver rise fetch failed, fallback used: {exc}")
+            rows = FALLBACK_ROWS[:]
+        else:
+            print(f"[WARN] Naver rise fetch failed, no stale fallback sent: {exc}")
+            rows = []
 
     rows.sort(key=lambda row: row["rate"], reverse=True)
     return rows[:20]
 
 
 def enrich(row: dict, seen: set[str]) -> dict:
-    meta = NEWS_MAP.get(row["name"], {})
+    meta = fetch_stock_news(row["name"])
+    if not meta and ALLOW_FALLBACK_DATA:
+        meta = NEWS_MAP.get(row["name"], {})
     if not meta:
-        meta = fetch_stock_news(row["name"])
+        meta = {}
     title = row["name"] + (" [신규진입]" if row["code"] not in seen else "")
     return {
         **row,
@@ -331,8 +338,21 @@ def enrich(row: dict, seen: set[str]) -> dict:
         "feature": meta.get("feature", f"{row['name']} 장중 15% 이상 급등"),
         "link": meta.get("link", f"https://finance.naver.com/item/main.naver?code={row['code']}"),
         "related": meta.get("related", "동일 테마/업종 확인 필요"),
-        "importance": meta.get("importance", "🟨 ★★"),
+        "importance": meta.get("importance", infer_importance(row, meta)),
     }
+
+
+def infer_importance(row: dict, meta: dict) -> str:
+    text = " ".join([row.get("name", ""), meta.get("news", ""), meta.get("feature", ""), meta.get("related", "")])
+    if row.get("rate", 0) >= 29.5 and any(key in text for key in ("AI", "반도체", "엔비디아", "퓨리오사", "로봇", "바이오")):
+        return "🟥 ★★★★"
+    if row.get("rate", 0) >= 29.5:
+        return "🟧 ★★★"
+    if any(key in text for key in ("AI", "반도체", "엔비디아", "퓨리오사", "2차전지", "바이오")):
+        return "🟧 ★★★"
+    if row.get("rate", 0) >= 20:
+        return "🟨 ★★"
+    return "⬜ ★"
 
 
 def row_theme_text(row: dict) -> str:
@@ -430,6 +450,50 @@ def build_news_schedule_lines(rows: list[dict]) -> list[str]:
     return result or ["- 최신 일정성 뉴스 자동 수집 실패: 장중 주요 뉴스 수동 확인 필요"]
 
 
+def split_related_names(value: str) -> list[str]:
+    names = []
+    for part in re.split(r"[,/·]", clean_text(value)):
+        name = part.strip()
+        if not name or name in {"관련주", "테마", "동일 테마", "업종 확인 필요", "확인 필요"}:
+            continue
+        if len(name) > 18:
+            continue
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def build_watchlist_lines(rows: list[dict], limit: int = 7) -> list[str]:
+    current_names = {row["name"] for row in rows}
+    candidates: list[dict] = []
+    seen = set()
+
+    for row in rows:
+        for name in split_related_names(row.get("related", "")):
+            if name in current_names or name in seen:
+                continue
+            seen.add(name)
+            candidates.append(
+                {
+                    "name": name,
+                    "importance": row.get("importance", "🟨 ★★"),
+                    "reason": shorten(f"{row['name']} 급등 테마 연동: {row.get('feature', row.get('news', ''))}", 54),
+                }
+            )
+            if len(candidates) >= limit:
+                break
+        if len(candidates) >= limit:
+            break
+
+    if not candidates:
+        return ["- 당일 급등 종목의 관련주 자동 추출 실패: 관련 테마 수동 확인 필요"]
+
+    return [
+        f"{idx}. {item['name']}: {item['importance']} {item['reason']}"
+        for idx, item in enumerate(candidates, 1)
+    ]
+
+
 def version1(rows: list[dict]) -> str:
     now = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
     upper = [r for r in rows if r["status"] == "상한가"]
@@ -462,13 +526,7 @@ def version1(rows: list[dict]) -> str:
             *build_news_schedule_lines(rows),
             "",
             "추가 급등 가능 관찰 기업",
-            "1. DSC인베스트먼트: 🟥 ★★★★ 퓨리오사AI 초기 투자",
-            "2. 엑스페릭스: 🟧 ★★★ 퓨리오사AI 총판계약",
-            "3. LB인베스트먼트: 🟧 ★★★ 퓨리오사AI 투자 VC",
-            "4. 나우IB: 🟨 ★★ 퓨리오사AI 투자 관련주",
-            "5. NAVER: 🟧 ★★★ 젠슨 황 회동·하이퍼클로바X",
-            "6. 현대차: 🟧 ★★★ 피지컬AI·로봇 협력 기대",
-            "7. 삼성SDS: 🟨 ★★ AI·클라우드",
+            *build_watchlist_lines(rows),
         ]
     )
     return "\n".join(lines).strip()
