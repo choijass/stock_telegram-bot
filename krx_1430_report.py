@@ -109,7 +109,10 @@ def main():
  hist[today]=[{"code":x["code"],"name":x["name"],"close":x["close"],"turnover":round(x["turnover"]),"pct":x["pct"]} for x in big]
  for k in sorted(hist)[:-45]:hist.pop(k,None)
  HIST.parent.mkdir(exist_ok=True);HIST.write_text(json.dumps(hist,ensure_ascii=False,indent=2),encoding="utf-8")
- L=[f"📌 {NOW:%m/%d} 14:30 주도 섹터/테마 현황","",f"코스피 {kpp:+.2f}%·{kp:,.2f}, 코스닥 {kdp:+.2f}%·{kd:,.2f}","※ 14:30 전후 현재가 기준. 거래대금은 현재가×누적거래량 추정치.",""]
+ def ix(v,p):
+  if v is None: return "데이터 확인중"
+  return f"{(p or 0):+.2f}%·{v:,.2f}"
+ L=[f"📌 {NOW:%m/%d} 14:30 주도 섹터/테마 현황","",f"코스피 {ix(kp,kpp)}, 코스닥 {ix(kd,kdp)}","※ 14:30 전후 현재가 기준. 거래대금은 현재가×누적거래량 추정치.",""]
  for i,r in enumerate(leaders):
   _,name,pos,total,avg,top=r;L += [f"✅ {i+1}위 {name}",f"상승 {pos}/{total} · 평균 {avg:+.2f}%"]
   for x in top:L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}"+(" / 거래대금 2,000억 돌파" if x["turnover"]>=MIN else ""))
