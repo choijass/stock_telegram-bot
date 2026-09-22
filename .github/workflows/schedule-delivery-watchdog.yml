@@ -1,0 +1,31 @@
+name: Schedule Delivery Watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Domestic report checks: 11:15, 13:15, 14:45 KST on weekdays.
+    - cron: "15 2,4 * * 1-5"
+    - cron: "45 5 * * 1-5"
+    # US report check: 07:10 KST after US trading sessions.
+    - cron: "10 22 * * 1-5"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: schedule-delivery-watchdog
+  cancel-in-progress: false
+
+jobs:
+  verify-and-retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify scheduled reports and retry missing runs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/schedule_watchdog.py
