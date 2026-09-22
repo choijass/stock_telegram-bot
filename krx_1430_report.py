@@ -4,6 +4,7 @@ import os,json,re,time,math
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 import requests,pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 KST=timezone(timedelta(hours=9)); NOW=datetime.now(KST)
 BASE="https://finance.naver.com"; H={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150 Safari/537.36","Referer":"https://finance.naver.com/"}
@@ -145,8 +146,17 @@ def main():
  for r in leaders:
   enrich_codes.update(x["code"] for x in r[5])
  enrich={}
- for code in list(enrich_codes):
-  enrich[code]=daily_info(code)
+ # Parallel history fetch. Sequential full-universe requests exceeded the 30-minute job timeout.
+ def _load(code):
+  return code,daily_info(code)
+ with ThreadPoolExecutor(max_workers=24) as ex:
+  futures=[ex.submit(_load,code) for code in enrich_codes]
+  for fut in as_completed(futures):
+   try:
+    code,info=fut.result()
+    enrich[code]=info
+   except Exception:
+    pass
  for x in stocks:
   e=enrich.get(x["code"],{})
   avg=e.get("avg20_turnover",0)
