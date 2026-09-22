@@ -154,7 +154,7 @@ def main():
   if v is None: return "데이터 확인중"
   return f"{(p or 0):+.2f}%·{v:,.2f}"
  up=sum(x["pct"]>0 for x in stocks); down=sum(x["pct"]<0 for x in stocks)
- L=[f"🇰🇷 [국내장] 실시간 지표 정리 — 확장판",f"{NOW:%Y-%m-%d} / 15:30 정규장 마감 기준","",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개","", "① 20영업일 최고거래대금·거래대금 폭증"]
+ L=[f"🇰🇷 [국내장] 실시간 지표 정리 — 확장판",f"{NOW:%Y-%m-%d} / 15:30 정규장 마감 기준","",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
  for i,r in enumerate(leaders):
   _,name,pos,total,avg,top=r;L += [f"✅ {i+1}위 {name}",f"상승 {pos}/{total} · 평균 {avg:+.2f}%"]
   for x in top:
@@ -165,7 +165,16 @@ def main():
    elif x.get("high52"):flags.append("52주 신고가")
    L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}"+((" / "+" / ".join(flags)) if flags else ""))
   L.append("")
- L+=["⑤ 🔥 거래대금 2,000억 이상 (+2% 이상)"]
+ L+=["","⑤ VCP 구간 돌파시도",
+"※ VCP는 2~4회 변동성 수축·거래량 건조·20MA/50MA 우상향·피벗 접근을 모두 검증한 경우만 확정.",
+"현재 자동 스캐너에서 전 조건 미충족 종목은 임의 확정하지 않음.",
+"","⑥ 20MA 구간 돌파시도",
+"※ 전일까지 20MA 아래 → 오늘 종가 20MA 상향돌파 + 거래대금 증가 조건으로 판정.",
+"전종목 일봉 시계열이 확보되지 않은 종목은 확인 불가로 표시.",
+"","⑦ VWAP 구간 돌파시도",
+"※ 실제 분봉 VWAP 아래→상향돌파→종가 유지/재이탈 경로가 확인된 경우만 확정.",
+"누적 거래대금÷거래량을 정식 VWAP 신호로 대체하지 않음.",
+"","⑧ 🔥 거래대금 2,000억 이상 (+2% 이상)"]
  if big:
   for x in big[:30]:
    flags=["2,000억 돌파"]
@@ -184,7 +193,7 @@ def main():
  L+=["","④ 52주·역사적 신고가 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+("역사적 신고가" if x.get("ath") else "52주 신고가") for x in br[:20]] or ["해당 종목 없음"]
  L.append("")
- L.append("⑥ 📊 전일 2,000억 돌파 종목 D+1 성과")
+ L.append("⑩ 📊 전일 2,000억 돌파 종목 D+1 성과")
  if d1:
   for hp,cp,cur,old in d1[:20]:L.append(f"[장중최고 {hp:+.2f}% / 현재 {cp:+.2f}%] {cur['name']} (전일 {money(old['turnover'])})")
   hs=[x[0] for x in d1];cs=[x[1] for x in d1];L+=["",f"대상 {len(d1)}종목 · 장중최고 평균 {sum(hs)/len(hs):+.2f}% · 중앙값 {pd.Series(hs).median():+.2f}%",f"종가 평균 {sum(cs)/len(cs):+.2f}% · 중앙값 {pd.Series(cs).median():+.2f}%",f"장중 +3% 도달률 {sum(x>=3 for x in hs)/len(hs)*100:.1f}% · 종가 플러스 유지율 {sum(x>0 for x in cs)/len(cs)*100:.1f}%"]
