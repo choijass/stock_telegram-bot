@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 KST=timezone(timedelta(hours=9)); NOW=datetime.now(KST)
 BASE="https://finance.naver.com"; H={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150 Safari/537.36","Referer":"https://finance.naver.com/"}
-TOKEN=os.getenv("TELEGRAM_BOT_TOKEN",""); CHAT=os.getenv("TELEGRAM_CHAT_ID","@sang_red")
+TOKEN=os.getenv("TELEGRAM_BOT_TOKEN",""); CHAT=os.getenv("TELEGRAM_CHAT_ID","@sang_red"); MODE=os.getenv("REPORT_MODE","1530")
 HIST=Path("data/turnover_2000_history.json"); MIN=200_000_000_000
 def n(v):
  s=str(v).replace(",","").replace("%","").replace("+","").strip()
@@ -217,7 +217,7 @@ def main():
   if v is None: return "데이터 확인중"
   return f"{(p or 0):+.2f}%·{v:,.2f}"
  up=sum(x["pct"]>0 for x in stocks); down=sum(x["pct"]<0 for x in stocks)
- L=[f"🇰🇷 [국내장] 실시간 지표 정리 — 확장판",f"{NOW:%Y-%m-%d} / 15:30 정규장 마감 기준","",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
+ L=[f"🇰🇷 [국내장] 실시간 지표 정리 — "+("14:00 장중판" if MODE=="1400" else "15:30 장마감 확장판"),f"{NOW:%Y-%m-%d} / "+("14:00 현재 기준" if MODE=="1400" else "15:30 정규장 마감 기준"),"",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
  t20=sorted([x for x in common if x.get("turnover20_break")],key=lambda x:x["turnover"],reverse=True)
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / 20일 최고 거래대금" for x in t20[:20]] or ["신규 돌파 없음"]
  aths=sorted([x for x in common if common_stock(x) and x.get("ath")],key=lambda x:x["turnover"],reverse=True)
@@ -292,5 +292,5 @@ def main():
    e=enrich.get(x["code"],{}); hi=e.get("high")
    L.append(f"{i}. {x['name']} — 종가 {x['close']:,.0f} / 당일고가 {hi:,.0f}" if hi else f"{i}. {x['name']} — 종가 {x['close']:,.0f}")
   L+=["",f"📌 최종 판단: {leaders[0][1]}이 거래대금과 상승 종목 확산에서 가장 강한 마감 주도 섹터. 다음 거래일에는 대장주 거래대금 승계와 신고가 확산 여부를 우선 확인."]
- msg="\n".join(L);Path("results").mkdir(exist_ok=True);Path(f"results/krx_1530_{NOW:%Y%m%d}.txt").write_text(msg,encoding="utf-8");send(msg);print(msg)
+ msg="\n".join(L);Path("results").mkdir(exist_ok=True);Path(f"results/krx_{MODE}_{NOW:%Y%m%d}.txt").write_text(msg,encoding="utf-8");send(msg);print(msg)
 if __name__=="__main__":main()
