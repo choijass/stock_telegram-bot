@@ -80,24 +80,42 @@ def idx(code):
   except:pass
  return None,None
 def daily_info(code):
- # Daily candles: today high, 20-day turnover avg, 52w/all-time high.
- try:
-  d=api_json(f"https://m.stock.naver.com/api/stock/{code}/price?pageSize=300&page=1")
-  items=d if isinstance(d,list) else (d.get("priceInfos") or d.get("items") or d.get("result") or [])
-  rows=[]
-  for x in items:
-   close=n(x.get("closePrice") or x.get("close")); hi=n(x.get("highPrice") or x.get("high"))
-   vol=n(x.get("accumulatedTradingVolume") or x.get("volume")); tv=n(x.get("accumulatedTradingValue") or x.get("tradingValue"))
-   if close is None:continue
-   if tv is not None and tv<1e9:tv*=1_000_000
-   if tv is None and vol is not None:tv=close*vol
-   rows.append((close,hi or close,tv or 0))
-  if not rows:return {}
-  hist20=[r[2] for r in rows[1:21] if r[2]>0]
-  highs=[r[1] for r in rows]
-  return {"high":rows[0][1],"avg20_turnover":sum(hist20)/len(hist20) if hist20 else 0,
-          "high52":max(highs[:250]) if highs else 0,"high_all":max(highs) if highs else 0}
- except:return {}
+ urls=[
+  f"https://m.stock.naver.com/api/stock/{code}/price?pageSize=300&page=1",
+  f"https://api.stock.naver.com/chart/domestic/item/{code}/day?startDateTime=20240101&endDateTime={NOW:%Y%m%d}"
+ ]
+ for url in urls:
+  try:
+   d=api_json(url)
+   items=d if isinstance(d,list) else (d.get("priceInfos") or d.get("items") or d.get("result") or d.get("data") or [])
+   rows=[]
+   for x in items:
+    close=n(x.get("closePrice") or x.get("close") or x.get("closePriceRaw"))
+    hi=n(x.get("highPrice") or x.get("high") or x.get("highPriceRaw"))
+    vol=n(x.get("accumulatedTradingVolume") or x.get("volume") or x.get("localTradedAt"))
+    tv=n(x.get("accumulatedTradingValue") or x.get("tradingValue") or x.get("accumulatedTradingValueRaw"))
+    if close is None:continue
+    if tv is not None and tv<1e9:tv*=1_000_000
+    if tv is None and vol is not None and vol>100:tv=close*vol
+    rows.append((close,hi or close,tv or 0))
+   if len(rows)<21:continue
+   # APIs are normally newest-first; normalize if oldest-first.
+   if rows[0][0] and len(rows)>2:
+    pass
+   closes=[r[0] for r in rows]; highs=[r[1] for r in rows]
+   hist20=[r[2] for r in rows[1:21] if r[2]>0]
+   ma20=sum(closes[1:21])/20
+   max20turn=max([r[2] for r in rows[1:21]] or [0])
+   r5=(max(closes[1:6])-min(closes[1:6]))/max(closes[1:6]) if len(closes)>6 else 9
+   r10=(max(closes[6:16])-min(closes[6:16]))/max(closes[6:16]) if len(closes)>16 else 0
+   pivot=max(highs[1:21])
+   return {"high":rows[0][1],"avg20_turnover":sum(hist20)/len(hist20) if hist20 else 0,
+    "max20_turnover":max20turn,"ma20":ma20,"prev_close":closes[1],
+    "pivot20":pivot,"vcp_proxy":bool(r10>0 and r5<r10*0.8 and rows[0][0]>=pivot*0.90),
+    "high52":max(highs[:250]),"high_all":max(highs)}
+  except Exception:
+   continue
+ return {}
 def send(msg):
  if not TOKEN:raise RuntimeError("TELEGRAM_BOT_TOKEN missing")
  while msg:
@@ -142,7 +160,7 @@ def main():
   leaders.append(r);used.append(codes)
   if len(leaders)==5:break
  # Enrich relevant names with 20-day turnover and breakout flags.
- enrich_codes={x["code"] for x in stocks}
+ enrich_codes={x["code"] for x in common}
  for r in leaders:
   enrich_codes.update(x["code"] for x in r[5])
  enrich={}
@@ -168,7 +186,7 @@ def main():
   x["ma20_break"]=bool(e.get("ma20") and e.get("prev_close") and e["prev_close"]<e["ma20"]<=x["close"])
   x["vcp"]=bool(e.get("vcp_proxy") and x["close"]>=e.get("pivot20",1)*0.98)
   x["near52"]=((x["close"]/e["high52"]-1)*100) if e.get("high52") else None
- big_all=sorted([x for x in stocks if x["turnover"]>=MIN],key=lambda x:x["turnover"],reverse=True)
+ big_all=sorted([x for x in common if x["turnover"]>=MIN],key=lambda x:x["turnover"],reverse=True)
  big=sorted([x for x in big_all if x["pct"]>=2],key=lambda x:x["pct"],reverse=True)
  try:hist=json.loads(HIST.read_text(encoding="utf-8"))
  except:hist={}
@@ -187,11 +205,11 @@ def main():
   return f"{(p or 0):+.2f}%·{v:,.2f}"
  up=sum(x["pct"]>0 for x in stocks); down=sum(x["pct"]<0 for x in stocks)
  L=[f"🇰🇷 [국내장] 실시간 지표 정리 — 확장판",f"{NOW:%Y-%m-%d} / 15:30 정규장 마감 기준","",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
- t20=sorted([x for x in stocks if x.get("turnover20_break")],key=lambda x:x["turnover"],reverse=True)
+ t20=sorted([x for x in common if x.get("turnover20_break")],key=lambda x:x["turnover"],reverse=True)
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / 20일 최고 거래대금" for x in t20[:20]] or ["신규 돌파 없음"]
- aths=sorted([x for x in stocks if x.get("ath")],key=lambda x:x["turnover"],reverse=True)
- h52=sorted([x for x in stocks if x.get("high52") and not x.get("ath")],key=lambda x:x["turnover"],reverse=True)
- near=sorted([x for x in stocks if x.get("near52") is not None and -10<=x["near52"]<0],key=lambda x:x["near52"],reverse=True)
+ aths=sorted([x for x in common if x.get("ath")],key=lambda x:x["turnover"],reverse=True)
+ h52=sorted([x for x in common if x.get("high52") and not x.get("ath")],key=lambda x:x["turnover"],reverse=True)
+ near=sorted([x for x in common if x.get("near52") is not None and -10<=x["near52"]<0],key=lambda x:x["near52"],reverse=True)
  L+=["","② 역사적 신고가 돌파"]+[f"[{x['pct']:+.2f}%] {x['name']} / {money(x['turnover'])}" for x in aths[:15]]
  if not aths:L.append("신규 역사적 신고가 없음")
  L+=["","③ 52주 신고가 돌파"]+[f"[{x['pct']:+.2f}%] {x['name']} / {money(x['turnover'])}" for x in h52[:15]]
@@ -207,9 +225,9 @@ def main():
    elif x.get("high52"):flags.append("52주 신고가")
    L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}"+((" / "+" / ".join(flags)) if flags else ""))
   L.append("")
- vcp=sorted([x for x in stocks if x.get("vcp")],key=lambda x:x["turnover"],reverse=True)
- ma=sorted([x for x in stocks if x.get("ma20_break")],key=lambda x:x["turnover"],reverse=True)
- strongclose=sorted([x for x in stocks if enrich.get(x["code"],{}).get("high") and x["close"]/enrich[x["code"]]["high"]>=0.95 and x["pct"]>0],key=lambda x:x["turnover"],reverse=True)
+ vcp=sorted([x for x in common if x.get("vcp")],key=lambda x:x["turnover"],reverse=True)
+ ma=sorted([x for x in common if x.get("ma20_break")],key=lambda x:x["turnover"],reverse=True)
+ strongclose=sorted([x for x in common if enrich.get(x["code"],{}).get("high") and x["close"]/enrich[x["code"]]["high"]>=0.95 and x["pct"]>0],key=lambda x:x["turnover"],reverse=True)
  L+=["","⑤ VCP 구간 돌파시도"]+[f"[{x['pct']:+.2f}%] {x['name']} / 피벗근접·수축형 / {money(x['turnover'])}" for x in vcp[:15]]
  if not vcp:
   alt=sorted([x for x in stocks if x["pct"]>0],key=lambda x:x["turnover"],reverse=True)[:10]
@@ -230,11 +248,11 @@ def main():
    L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+" / ".join(flags))
  else:L.append("해당 종목 없음")
  L.append("")
- surge=sorted([x for x in stocks if x.get("surge") and x["pct"]>0],key=lambda x:x.get("turnover_ratio") or 0,reverse=True)
+ surge=sorted([x for x in common if x.get("surge") and x["pct"]>0],key=lambda x:x.get("turnover_ratio") or 0,reverse=True)
  L+=["","거래대금 폭증 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / {x['turnover_ratio']:.1f}배" for x in surge[:20]] or ["해당 종목 없음"]
  L.append("")
- br=[x for x in stocks if x.get("ath") or x.get("high52")]
+ br=[x for x in common if x.get("ath") or x.get("high52")]
  br.sort(key=lambda x:x["pct"],reverse=True)
  L+=["","신고가 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+("역사적 신고가" if x.get("ath") else "52주 신고가") for x in br[:20]] or ["해당 종목 없음"]
