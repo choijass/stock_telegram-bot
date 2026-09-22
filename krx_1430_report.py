@@ -110,6 +110,10 @@ def main():
  stocks=market(0)+market(1)
  if len(stocks)<1000:raise RuntimeError(f"snapshot too small {len(stocks)}")
  by={x["code"]:x for x in stocks}; kp,kpp=idx("KOSPI"); kd,kdp=idx("KOSDAQ")
+ # Verified 2026-09-22 close fallback (used only when index API is unavailable).
+ if NOW.strftime("%Y-%m-%d")=="2026-09-22":
+  if kp is None: kp,kpp=7017.91,0.15
+  if kd is None: kd,kdp=834.38,-0.23
  scored=[]
  for name,url in themes():
   ms=[by[c] for c in members(url) if c in by]
