@@ -2,6 +2,11 @@ name: ETF Momentum Today
 
 on:
   workflow_dispatch:
+  schedule:
+    # 11:00, 13:00, 14:30 KST, Monday-Friday.
+    # GitHub cron uses UTC: 02:00, 04:00, 05:30.
+    - cron: "0 2,4 * * 1-5"
+    - cron: "30 5 * * 1-5"
 
 permissions:
   contents: read
