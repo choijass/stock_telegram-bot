@@ -153,7 +153,8 @@ def main():
  def ix(v,p):
   if v is None: return "데이터 확인중"
   return f"{(p or 0):+.2f}%·{v:,.2f}"
- L=[f"📌 {NOW:%m/%d} 14:30 주도 섹터/테마 현황","",f"코스피 {ix(kp,kpp)}, 코스닥 {ix(kd,kdp)}","※ 14:30 전후 현재가 기준. 거래대금은 현재가×누적거래량 추정치.",""]
+ up=sum(x["pct"]>0 for x in stocks); down=sum(x["pct"]<0 for x in stocks)
+ L=[f"🇰🇷 [국내장] 실시간 지표 정리 — 확장판",f"{NOW:%Y-%m-%d} / 15:30 정규장 마감 기준","",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개","", "① 20영업일 최고거래대금·거래대금 폭증"]
  for i,r in enumerate(leaders):
   _,name,pos,total,avg,top=r;L += [f"✅ {i+1}위 {name}",f"상승 {pos}/{total} · 평균 {avg:+.2f}%"]
   for x in top:
@@ -164,7 +165,7 @@ def main():
    elif x.get("high52"):flags.append("52주 신고가")
    L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}"+((" / "+" / ".join(flags)) if flags else ""))
   L.append("")
- L+=["🔥 거래대금 2,000억 돌파 (+2% 이상)"]
+ L+=["⑤ 🔥 거래대금 2,000억 이상 (+2% 이상)"]
  if big:
   for x in big[:30]:
    flags=["2,000억 돌파"]
@@ -175,19 +176,35 @@ def main():
  else:L.append("해당 종목 없음")
  L.append("")
  surge=sorted([x for x in stocks if x.get("surge") and x["pct"]>0],key=lambda x:x.get("turnover_ratio") or 0,reverse=True)
- L+=["🚀 20일 평균 대비 거래대금 폭증"]
+ L+=["","② 역사적·52주 신고가","", "③ 20일 평균 대비 거래대금 폭증"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / {x['turnover_ratio']:.1f}배" for x in surge[:20]] or ["해당 종목 없음"]
  L.append("")
  br=[x for x in stocks if x.get("ath") or x.get("high52")]
  br.sort(key=lambda x:x["pct"],reverse=True)
- L+=["🏁 52주·역사적 신고가"]
+ L+=["","④ 52주·역사적 신고가 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+("역사적 신고가" if x.get("ath") else "52주 신고가") for x in br[:20]] or ["해당 종목 없음"]
  L.append("")
- L.append("📊 전일 2,000억 돌파 종목 D+1 성과")
+ L.append("⑥ 📊 전일 2,000억 돌파 종목 D+1 성과")
  if d1:
   for hp,cp,cur,old in d1[:20]:L.append(f"[장중최고 {hp:+.2f}% / 현재 {cp:+.2f}%] {cur['name']} (전일 {money(old['turnover'])})")
-  hs=[x[0] for x in d1];cs=[x[1] for x in d1];L+=["",f"대상 {len(d1)}종목 · 장중최고 평균 {sum(hs)/len(hs):+.2f}% · 중앙값 {pd.Series(hs).median():+.2f}%",f"현재 평균 {sum(cs)/len(cs):+.2f}% · 중앙값 {pd.Series(cs).median():+.2f}%",f"장중 +3% 도달률 {sum(x>=3 for x in hs)/len(hs)*100:.1f}% · 현재 플러스 유지율 {sum(x>0 for x in cs)/len(cs)*100:.1f}%"]
+  hs=[x[0] for x in d1];cs=[x[1] for x in d1];L+=["",f"대상 {len(d1)}종목 · 장중최고 평균 {sum(hs)/len(hs):+.2f}% · 중앙값 {pd.Series(hs).median():+.2f}%",f"종가 평균 {sum(cs)/len(cs):+.2f}% · 중앙값 {pd.Series(cs).median():+.2f}%",f"장중 +3% 도달률 {sum(x>=3 for x in hs)/len(hs)*100:.1f}% · 종가 플러스 유지율 {sum(x>0 for x in cs)/len(cs)*100:.1f}%"]
  else:L.append("누적 데이터 없음 — 오늘 저장 후 다음 거래일부터 자동 계산")
- if leaders:L+=["",f"🏆 현재 대장 섹터: {leaders[0][1]}","유지 체크: 대장주 상승 유지 + 2,000억 거래대금 종목 확산","이탈 체크: 대장주 동반 음전 + 고거래대금 종목 상승분 반납"]
- msg="\n".join(L);Path("results").mkdir(exist_ok=True);Path(f"results/krx_1430_{NOW:%Y%m%d}.txt").write_text(msg,encoding="utf-8");send(msg);print(msg)
+ if leaders:
+  L+=["","# 🔥 오늘 SIGNAL",f"시장 색깔: 거래대금·상승폭·섹터 확산 기준 {leaders[0][1]} 중심 선택적 주도",
+      "주도 섹터: "+ " → ".join(f"{i+1} {r[1]}" for i,r in enumerate(leaders)),
+      f"거래대금 대장: {max(stocks,key=lambda x:x['turnover'])['name']} {money(max(stocks,key=lambda x:x['turnover'])['turnover'])}",
+      f"모멘텀 거래대금 대장: {big[0]['name']} {money(big[0]['turnover'])} / {big[0]['pct']:+.2f}%" if big else "모멘텀 거래대금 대장: 없음",
+      "신고가 확산: "+("확인" if br else "약함"),
+      "","👀 다음 거래일 우선 체크 Top5"]
+  picks=[]
+  for r in leaders:
+   for x in r[5]:
+    if x["code"] not in {p["code"] for p in picks}:picks.append(x)
+    if len(picks)>=5:break
+   if len(picks)>=5:break
+  for i,x in enumerate(picks,1):
+   e=enrich.get(x["code"],{}); hi=e.get("high")
+   L.append(f"{i}. {x['name']} — 종가 {x['close']:,.0f} / 당일고가 {hi:,.0f}" if hi else f"{i}. {x['name']} — 종가 {x['close']:,.0f}")
+  L+=["",f"📌 최종 판단: {leaders[0][1]}이 거래대금과 상승 종목 확산에서 가장 강한 마감 주도 섹터. 다음 거래일에는 대장주 거래대금 승계와 신고가 확산 여부를 우선 확인."]
+ msg="\n".join(L);Path("results").mkdir(exist_ok=True);Path(f"results/krx_1530_{NOW:%Y%m%d}.txt").write_text(msg,encoding="utf-8");send(msg);print(msg)
 if __name__=="__main__":main()
