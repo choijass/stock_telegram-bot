@@ -31,7 +31,7 @@ jobs:
       - name: Send 종합버젼stock
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID: "@sang_red"
           TELEGRAM_REQUIRED: "true"
           GITHUB_TOKEN: ${{ github.token }}
         run: python "종합버젼stock.py"
