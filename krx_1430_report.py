@@ -128,11 +128,17 @@ def money(x):return f"{x/1e8:,.0f}억"
 def main():
  stocks=market(0)+market(1)
  def common_stock(x):
-  name=x["name"]
-  banned=("KODEX","TIGER","RISE","SOL ","ACE ","HANARO","PLUS ","KOSEF","TIMEFOLIO","KBSTAR","ARIRANG","FOCUS","UNICORN","히어로즈")
-  if any(name.startswith(z) for z in banned) or "스팩" in name or "ETN" in name:return False
+  name=x["name"].strip()
+  # Common-stock only universe. Exclude ETFs/ETNs, SPACs, preferred shares,
+  # REITs, funds, infrastructure funds and other listed products.
+  banned_prefix=("KODEX","TIGER","RISE","SOL ","ACE ","HANARO","PLUS ","KOSEF","TIMEFOLIO","KBSTAR","ARIRANG","FOCUS","UNICORN","히어로즈","1Q ","WON ","KIWOOM ","KoAct","BNK ","HK ","TREX","MASTER","파워","마이티","마이다스")
+  banned_words=("스팩","ETN","리츠","인프라","맥쿼리인프라","부동산","REIT","ETF","선물","레버리지","인버스","액티브(합성)","채권혼합","금리")
+  if any(name.startswith(z) for z in banned_prefix):return False
+  if any(z in name for z in banned_words):return False
   if name.endswith("우") or re.search(r"우[BC]?$",name):return False
-  return True
+  # Korean common shares normally have a 6-digit item code ending in 0/5;
+  # name filters above handle exceptions conservatively.
+  return bool(re.fullmatch(r"\d{6}",str(x.get("code",""))))
  common=[x for x in stocks if common_stock(x)]
  if len(stocks)<1000:raise RuntimeError(f"snapshot too small {len(stocks)}")
  by={x["code"]:x for x in stocks}; kp,kpp=idx("KOSPI"); kd,kdp=idx("KOSDAQ")
@@ -214,9 +220,9 @@ def main():
  L=[f"🇰🇷 [국내장] 실시간 지표 정리 — 확장판",f"{NOW:%Y-%m-%d} / 15:30 정규장 마감 기준","",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
  t20=sorted([x for x in common if x.get("turnover20_break")],key=lambda x:x["turnover"],reverse=True)
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / 20일 최고 거래대금" for x in t20[:20]] or ["신규 돌파 없음"]
- aths=sorted([x for x in common if x.get("ath")],key=lambda x:x["turnover"],reverse=True)
- h52=sorted([x for x in common if x.get("high52") and not x.get("ath")],key=lambda x:x["turnover"],reverse=True)
- near=sorted([x for x in common if x.get("near52") is not None and -10<=x["near52"]<0],key=lambda x:x["near52"],reverse=True)
+ aths=sorted([x for x in common if common_stock(x) and x.get("ath")],key=lambda x:x["turnover"],reverse=True)
+ h52=sorted([x for x in common if common_stock(x) and x.get("high52") and not x.get("ath")],key=lambda x:x["turnover"],reverse=True)
+ near=sorted([x for x in common if common_stock(x) and x.get("near52") is not None and -10<=x["near52"]<0],key=lambda x:x["near52"],reverse=True)
  L+=["","② 역사적 신고가 돌파"]+[f"[{x['pct']:+.2f}%] {x['name']} / {money(x['turnover'])}" for x in aths[:15]]
  if not aths:L.append("신규 역사적 신고가 없음")
  L+=["","③ 52주 신고가 돌파"]+[f"[{x['pct']:+.2f}%] {x['name']} / {money(x['turnover'])}" for x in h52[:15]]
