@@ -1,7 +1,9 @@
-name: KRX 15:30 Closing Report
+name: KRX 14:00 + 15:30 Market Reports
 on:
   workflow_dispatch:
   schedule:
+    # 14:00 KST = 05:00 UTC; 15:30 KST = 06:30 UTC
+    - cron: "0 5 * * 1-5"
     - cron: "30 6 * * 1-5"
 permissions:
   contents: write
@@ -21,11 +23,17 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: python -m pip install -r requirements.txt
-      - name: Run 15:30 closing report
+      - name: Run scheduled market report
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: "@sang_red"
-        run: python krx_1430_report.py
+        run: |
+          HOUR=$(TZ=Asia/Seoul date +%H%M)
+          if [ "$HOUR" -lt "1500" ]; then
+            REPORT_MODE=1400 python krx_1430_report.py
+          else
+            REPORT_MODE=1530 python krx_1430_report.py
+          fi
       - name: Persist D+1 history
         run: |
           git config user.name "github-actions[bot]"
