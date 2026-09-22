@@ -7,3 +7,5 @@ google-auth
 pillow
 requests
 telethon
+beautifulsoup4
+lxml
