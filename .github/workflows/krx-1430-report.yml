@@ -1,12 +1,12 @@
-name: KRX 14:30 Leadership Report
+name: KRX 15:30 Closing Report
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 5 * * 1-5"
+    - cron: "30 6 * * 1-5"
 permissions:
   contents: write
 concurrency:
-  group: krx-1430-report
+  group: krx-1530-closing-report
   cancel-in-progress: false
 jobs:
   report:
@@ -21,7 +21,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: python -m pip install -r requirements.txt
-      - name: Run report
+      - name: Run 15:30 closing report
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: "@sang_red"
