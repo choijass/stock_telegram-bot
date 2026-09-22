@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 5
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_CHAT_ID: "@sang_red"
       TELEGRAM_PARSE_MODE: HTML
 
     steps:
