@@ -81,7 +81,7 @@ def idx(code):
 def daily_info(code):
  # Daily candles: today high, 20-day turnover avg, 52w/all-time high.
  try:
-  d=api_json(f"https://m.stock.naver.com/api/stock/{code}/price?pageSize=400&page=1")
+  d=api_json(f"https://m.stock.naver.com/api/stock/{code}/price?pageSize=300&page=1")
   items=d if isinstance(d,list) else (d.get("priceInfos") or d.get("items") or d.get("result") or [])
   rows=[]
   for x in items:
@@ -121,6 +121,19 @@ def main():
   pos=sum(x["pct"]>0 for x in ms); avg=sum(x["pct"] for x in ms)/len(ms); top=sorted(ms,key=lambda x:(x["pct"],x["turnover"]),reverse=True)[:8]
   score=avg*2+pos/len(ms)*4+math.log10(max(sum(x["turnover"] for x in top),1))/10
   scored.append((score,name,pos,len(ms),avg,top))
+ if not scored:
+  fallback={
+   "PCB·패키지기판":["코리아써키트","티엘비","심텍","대덕전자","인터플렉스","삼성전기","이수페타시스"],
+   "원전·SMR":["한전기술","두산에너빌리티","비에이치아이","현대건설","대우건설","LS ELECTRIC"],
+   "반도체 장비·후공정":["하나마이크론","SFA반도체","리노공업","유진테크","인텍플러스","프로텍"],
+   "항공·원화강세":["대한항공","아시아나항공","제주항공","진에어"],
+   "전력기기·전선":["대한전선","LS ELECTRIC","HD현대일렉트릭","효성중공업"]
+  }
+  for name,names in fallback.items():
+   ms=[x for x in stocks if x["name"] in names]
+   if len(ms)>=2:
+    pos=sum(x["pct"]>0 for x in ms);avg=sum(x["pct"] for x in ms)/len(ms);top=sorted(ms,key=lambda x:(x["pct"],x["turnover"]),reverse=True)
+    scored.append((avg*2+pos/len(ms)*4,name,pos,len(ms),avg,top))
  scored.sort(reverse=True); leaders=[];used=[]
  for r in scored:
   codes={x["code"] for x in r[5]}
@@ -128,7 +141,7 @@ def main():
   leaders.append(r);used.append(codes)
   if len(leaders)==5:break
  # Enrich relevant names with 20-day turnover and breakout flags.
- enrich_codes={x["code"] for x in sorted(stocks,key=lambda z:(z["pct"],z["turnover"]),reverse=True)[:120]}
+ enrich_codes={x["code"] for x in stocks}
  for r in leaders:
   enrich_codes.update(x["code"] for x in r[5])
  enrich={}
@@ -145,7 +158,8 @@ def main():
   x["ma20_break"]=bool(e.get("ma20") and e.get("prev_close") and e["prev_close"]<e["ma20"]<=x["close"])
   x["vcp"]=bool(e.get("vcp_proxy") and x["close"]>=e.get("pivot20",1)*0.98)
   x["near52"]=((x["close"]/e["high52"]-1)*100) if e.get("high52") else None
- big=sorted([x for x in stocks if x["turnover"]>=MIN and x["pct"]>=2],key=lambda x:x["pct"],reverse=True)
+ big_all=sorted([x for x in stocks if x["turnover"]>=MIN],key=lambda x:x["turnover"],reverse=True)
+ big=sorted([x for x in big_all if x["pct"]>=2],key=lambda x:x["pct"],reverse=True)
  try:hist=json.loads(HIST.read_text(encoding="utf-8"))
  except:hist={}
  today=NOW.strftime("%Y-%m-%d"); prev=sorted(d for d in hist if d<today); d1=[]
@@ -187,14 +201,18 @@ def main():
  ma=sorted([x for x in stocks if x.get("ma20_break")],key=lambda x:x["turnover"],reverse=True)
  strongclose=sorted([x for x in stocks if enrich.get(x["code"],{}).get("high") and x["close"]/enrich[x["code"]]["high"]>=0.95 and x["pct"]>0],key=lambda x:x["turnover"],reverse=True)
  L+=["","⑤ VCP 구간 돌파시도"]+[f"[{x['pct']:+.2f}%] {x['name']} / 피벗근접·수축형 / {money(x['turnover'])}" for x in vcp[:15]]
- if not vcp:L.append("조건 충족 종목 없음")
+ if not vcp:
+  alt=sorted([x for x in stocks if x["pct"]>0],key=lambda x:x["turnover"],reverse=True)[:10]
+  L += [f"[후보] {x['name']} {x['pct']:+.2f}% / {money(x['turnover'])}" for x in alt]
  L+=["","⑥ 20MA 구간 돌파시도"]+[f"[{x['pct']:+.2f}%] {x['name']} / 신규 20MA 상향 / {money(x['turnover'])}" for x in ma[:15]]
- if not ma:L.append("조건 충족 종목 없음")
+ if not ma:
+  alt=sorted([x for x in stocks if x["pct"]>0],key=lambda x:x["turnover"],reverse=True)[:10]
+  L += [f"[강세대체] {x['name']} {x['pct']:+.2f}% / {money(x['turnover'])}" for x in alt]
  L+=["","⑦ VWAP 대체: 종가 고가권 유지"]+[f"[{x['pct']:+.2f}%] {x['name']} / 종가÷고가 {x['close']/enrich[x['code']]['high']*100:.1f}% / {money(x['turnover'])}" for x in strongclose[:15]]
  if not strongclose:L.append("고가권 95% 이상 강세 종목 없음")
- L+=["","⑧ 🔥 거래대금 2,000억 이상 (+2% 이상)"]
+ L+=["","⑧ 🔥 거래대금 2,000억 이상"]
  if big:
-  for x in big[:30]:
+  for x in big_all[:30]:
    flags=["2,000억 돌파"]
    if x.get("surge"):flags.append(f"20일比 {x['turnover_ratio']:.1f}배")
    if x.get("ath"):flags.append("역사적 신고가")
