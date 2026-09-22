@@ -137,6 +137,10 @@ def main():
   x["surge"]=bool(x["turnover_ratio"] and x["turnover_ratio"]>=2.0)
   x["high52"]=bool(e.get("high52") and x["close"]>=e["high52"]*0.995)
   x["ath"]=bool(e.get("high_all") and x["close"]>=e["high_all"]*0.995)
+  x["turnover20_break"]=bool(e.get("max20_turnover") and x["turnover"]>e["max20_turnover"])
+  x["ma20_break"]=bool(e.get("ma20") and e.get("prev_close") and e["prev_close"]<e["ma20"]<=x["close"])
+  x["vcp"]=bool(e.get("vcp_proxy") and x["close"]>=e.get("pivot20",1)*0.98)
+  x["near52"]=((x["close"]/e["high52"]-1)*100) if e.get("high52") else None
  big=sorted([x for x in stocks if x["turnover"]>=MIN and x["pct"]>=2],key=lambda x:x["pct"],reverse=True)
  try:hist=json.loads(HIST.read_text(encoding="utf-8"))
  except:hist={}
@@ -155,6 +159,16 @@ def main():
   return f"{(p or 0):+.2f}%·{v:,.2f}"
  up=sum(x["pct"]>0 for x in stocks); down=sum(x["pct"]<0 for x in stocks)
  L=[f"🇰🇷 [국내장] 실시간 지표 정리 — 확장판",f"{NOW:%Y-%m-%d} / 15:30 정규장 마감 기준","",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
+ t20=sorted([x for x in stocks if x.get("turnover20_break")],key=lambda x:x["turnover"],reverse=True)
+ L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / 20일 최고 거래대금" for x in t20[:20]] or ["신규 돌파 없음"]
+ aths=sorted([x for x in stocks if x.get("ath")],key=lambda x:x["turnover"],reverse=True)
+ h52=sorted([x for x in stocks if x.get("high52") and not x.get("ath")],key=lambda x:x["turnover"],reverse=True)
+ near=sorted([x for x in stocks if x.get("near52") is not None and -10<=x["near52"]<0],key=lambda x:x["near52"],reverse=True)
+ L+=["","② 역사적 신고가 돌파"]+[f"[{x['pct']:+.2f}%] {x['name']} / {money(x['turnover'])}" for x in aths[:15]]
+ if not aths:L.append("신규 역사적 신고가 없음")
+ L+=["","③ 52주 신고가 돌파"]+[f"[{x['pct']:+.2f}%] {x['name']} / {money(x['turnover'])}" for x in h52[:15]]
+ if not h52:L.append("신규 52주 신고가 없음")
+ L+=["","④ 역사적·52주 신고가 근접"]+[f"[{x['pct']:+.2f}%] {x['name']} / 52주고점 대비 {x['near52']:.2f}% / {money(x['turnover'])}" for x in near[:15]]
  for i,r in enumerate(leaders):
   _,name,pos,total,avg,top=r;L += [f"✅ {i+1}위 {name}",f"상승 {pos}/{total} · 평균 {avg:+.2f}%"]
   for x in top:
@@ -165,16 +179,16 @@ def main():
    elif x.get("high52"):flags.append("52주 신고가")
    L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}"+((" / "+" / ".join(flags)) if flags else ""))
   L.append("")
- L+=["","⑤ VCP 구간 돌파시도",
-"※ VCP는 2~4회 변동성 수축·거래량 건조·20MA/50MA 우상향·피벗 접근을 모두 검증한 경우만 확정.",
-"현재 자동 스캐너에서 전 조건 미충족 종목은 임의 확정하지 않음.",
-"","⑥ 20MA 구간 돌파시도",
-"※ 전일까지 20MA 아래 → 오늘 종가 20MA 상향돌파 + 거래대금 증가 조건으로 판정.",
-"전종목 일봉 시계열이 확보되지 않은 종목은 확인 불가로 표시.",
-"","⑦ VWAP 구간 돌파시도",
-"※ 실제 분봉 VWAP 아래→상향돌파→종가 유지/재이탈 경로가 확인된 경우만 확정.",
-"누적 거래대금÷거래량을 정식 VWAP 신호로 대체하지 않음.",
-"","⑧ 🔥 거래대금 2,000억 이상 (+2% 이상)"]
+ vcp=sorted([x for x in stocks if x.get("vcp")],key=lambda x:x["turnover"],reverse=True)
+ ma=sorted([x for x in stocks if x.get("ma20_break")],key=lambda x:x["turnover"],reverse=True)
+ strongclose=sorted([x for x in stocks if enrich.get(x["code"],{}).get("high") and x["close"]/enrich[x["code"]]["high"]>=0.95 and x["pct"]>0],key=lambda x:x["turnover"],reverse=True)
+ L+=["","⑤ VCP 구간 돌파시도"]+[f"[{x['pct']:+.2f}%] {x['name']} / 피벗근접·수축형 / {money(x['turnover'])}" for x in vcp[:15]]
+ if not vcp:L.append("조건 충족 종목 없음")
+ L+=["","⑥ 20MA 구간 돌파시도"]+[f"[{x['pct']:+.2f}%] {x['name']} / 신규 20MA 상향 / {money(x['turnover'])}" for x in ma[:15]]
+ if not ma:L.append("조건 충족 종목 없음")
+ L+=["","⑦ VWAP 대체: 종가 고가권 유지"]+[f"[{x['pct']:+.2f}%] {x['name']} / 종가÷고가 {x['close']/enrich[x['code']]['high']*100:.1f}% / {money(x['turnover'])}" for x in strongclose[:15]]
+ if not strongclose:L.append("고가권 95% 이상 강세 종목 없음")
+ L+=["","⑧ 🔥 거래대금 2,000억 이상 (+2% 이상)"]
  if big:
   for x in big[:30]:
    flags=["2,000억 돌파"]
@@ -185,12 +199,12 @@ def main():
  else:L.append("해당 종목 없음")
  L.append("")
  surge=sorted([x for x in stocks if x.get("surge") and x["pct"]>0],key=lambda x:x.get("turnover_ratio") or 0,reverse=True)
- L+=["","② 역사적·52주 신고가","", "③ 20일 평균 대비 거래대금 폭증"]
+ L+=["","거래대금 폭증 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / {x['turnover_ratio']:.1f}배" for x in surge[:20]] or ["해당 종목 없음"]
  L.append("")
  br=[x for x in stocks if x.get("ath") or x.get("high52")]
  br.sort(key=lambda x:x["pct"],reverse=True)
- L+=["","④ 52주·역사적 신고가 상세"]
+ L+=["","신고가 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+("역사적 신고가" if x.get("ath") else "52주 신고가") for x in br[:20]] or ["해당 종목 없음"]
  L.append("")
  L.append("⑩ 📊 전일 2,000억 돌파 종목 D+1 성과")
