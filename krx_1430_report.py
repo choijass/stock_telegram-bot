@@ -127,6 +127,13 @@ def send(msg):
 def money(x):return f"{x/1e8:,.0f}억"
 def main():
  stocks=market(0)+market(1)
+ def common_stock(x):
+  name=x["name"]
+  banned=("KODEX","TIGER","RISE","SOL ","ACE ","HANARO","PLUS ","KOSEF","TIMEFOLIO","KBSTAR","ARIRANG","FOCUS","UNICORN","히어로즈")
+  if any(name.startswith(z) for z in banned) or "스팩" in name or "ETN" in name:return False
+  if name.endswith("우") or re.search(r"우[BC]?$",name):return False
+  return True
+ common=[x for x in stocks if common_stock(x)]
  if len(stocks)<1000:raise RuntimeError(f"snapshot too small {len(stocks)}")
  by={x["code"]:x for x in stocks}; kp,kpp=idx("KOSPI"); kd,kdp=idx("KOSDAQ")
  # Verified 2026-09-22 close fallback (used only when index API is unavailable).
