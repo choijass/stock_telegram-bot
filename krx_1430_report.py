@@ -6,7 +6,7 @@ from pathlib import Path
 import requests,pandas as pd
 from bs4 import BeautifulSoup
 KST=timezone(timedelta(hours=9)); NOW=datetime.now(KST)
-BASE="https://finance.naver.com"; H={"User-Agent":"Mozilla/5.0"}
+BASE="https://finance.naver.com"; H={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150 Safari/537.36","Referer":"https://finance.naver.com/"}
 TOKEN=os.getenv("TELEGRAM_BOT_TOKEN",""); CHAT=os.getenv("TELEGRAM_CHAT_ID","@sang_red")
 HIST=Path("data/turnover_2000_history.json"); MIN=200_000_000_000
 def n(v):
@@ -16,13 +16,17 @@ def n(v):
 def market(sosok):
  out=[]
  for page in range(1,45):
-  soup=BeautifulSoup(requests.get(f"{BASE}/sise/sise_market_sum.naver?sosok={sosok}&page={page}",headers=H,timeout=15).text,"html.parser"); found=0
+  url=f"{BASE}/sise/sise_market_sum.naver?sosok={sosok}&page={page}"
+  resp=requests.get(url,headers=H,timeout=15)
+  resp.raise_for_status()
+  resp.encoding="euc-kr"
+  soup=BeautifulSoup(resp.text,"html.parser"); found=0
   for tr in soup.select("table.type_2 tr"):
    a=tr.select_one("a.tltle")
    if not a:continue
    found+=1; m=re.search(r"code=(\d+)",a.get("href","")); td=[x.get_text(" ",strip=True) for x in tr.find_all("td")]
    if not m or len(td)<10:continue
-   close,pct,vol=n(td[2]),n(td[4]),n(td[9])
+   close,pct,vol=n(td[1]),n(td[3]),n(td[8])
    if None in (close,pct,vol):continue
    out.append({"code":m.group(1),"name":a.get_text(strip=True),"close":close,"pct":pct,"volume":vol,"turnover":close*vol})
   if not found:break
