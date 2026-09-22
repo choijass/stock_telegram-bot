@@ -42,34 +42,61 @@ def market(sosok):
   if len(items)<50: break
   page+=1
  return out
+def api_json(url):
+ r=requests.get(url,headers=H,timeout=15); r.raise_for_status(); return r.json()
 def themes():
- out=[]
- for p in range(1,8):
-  soup=BeautifulSoup(requests.get(f"{BASE}/sise/theme.naver?page={p}",headers=H,timeout=15).text,"html.parser")
-  for a in soup.select("td.col_type1 a"):
-   if "no=" in a.get("href",""):out.append((a.get_text(strip=True),BASE+a["href"]))
- return out
-def members(url):
- soup=BeautifulSoup(requests.get(url,headers=H,timeout=12).text,"html.parser"); out=[]
- for a in soup.select("table.type_5 a"):
-  m=re.search(r"code=(\d+)",a.get("href",""))
-  if m:out.append(m.group(1))
- return list(dict.fromkeys(out))
+ # Mobile theme list API; fallback to empty list if endpoint changes.
+ for url in ["https://m.stock.naver.com/api/theme/local?page=1&pageSize=200","https://m.stock.naver.com/api/theme/domestic?page=1&pageSize=200"]:
+  try:
+   d=api_json(url); items=d.get("themes") or d.get("items") or d.get("result") or []
+   out=[]
+   for x in items:
+    no=str(x.get("themeCode") or x.get("no") or x.get("code") or "")
+    name=x.get("themeName") or x.get("name") or ""
+    if no and name: out.append((name,no))
+   if out:return out
+  except:pass
+ return []
+def members(theme_code):
+ for url in [f"https://m.stock.naver.com/api/theme/{theme_code}",f"https://m.stock.naver.com/api/theme/{theme_code}/stocks"]:
+  try:
+   d=api_json(url); items=d.get("stocks") or d.get("items") or d.get("result") or []
+   out=[]
+   for x in items:
+    code=str(x.get("itemCode") or x.get("stockCode") or x.get("code") or "")
+    if code:out.append(code)
+   if out:return list(dict.fromkeys(out))
+  except:pass
+ return []
 def idx(code):
- soup=BeautifulSoup(requests.get(f"{BASE}/sise/sise_index.naver?code={code}",headers=H,timeout=12).text,"html.parser")
- v=n(soup.select_one("#now_value").get_text(strip=True)) if soup.select_one("#now_value") else None
- t=soup.select_one("#change_value_and_rate"); pct=None
- if t:
-  z=re.findall(r"[-+]?\d+(?:\.\d+)?%",t.get_text(" ",strip=True))
-  if z:pct=n(z[-1])
- return v,pct
-def high(code):
- soup=BeautifulSoup(requests.get(f"{BASE}/item/main.naver?code={code}",headers=H,timeout=10).text,"html.parser")
- for td in soup.select("table.no_info td"):
-  s=td.get_text(" ",strip=True)
-  if "고가" in s:
-   z=re.findall(r"[\d,]+",s)
-   if z:return n(z[-1])
+ # Mobile index API first.
+ for url in [f"https://m.stock.naver.com/api/index/{code}/basic",f"https://m.stock.naver.com/api/index/{code}"]:
+  try:
+   d=api_json(url)
+   v=n(d.get("closePrice") or d.get("nowVal") or d.get("currentPrice"))
+   p=n(d.get("fluctuationsRatio") or d.get("changeRate") or d.get("rate"))
+   if v is not None:return v,p
+  except:pass
+ return None,None
+def daily_info(code):
+ # Daily candles: today high, 20-day turnover avg, 52w/all-time high.
+ try:
+  d=api_json(f"https://m.stock.naver.com/api/stock/{code}/price?pageSize=400&page=1")
+  items=d if isinstance(d,list) else (d.get("priceInfos") or d.get("items") or d.get("result") or [])
+  rows=[]
+  for x in items:
+   close=n(x.get("closePrice") or x.get("close")); hi=n(x.get("highPrice") or x.get("high"))
+   vol=n(x.get("accumulatedTradingVolume") or x.get("volume")); tv=n(x.get("accumulatedTradingValue") or x.get("tradingValue"))
+   if close is None:continue
+   if tv is not None and tv<1e9:tv*=1_000_000
+   if tv is None and vol is not None:tv=close*vol
+   rows.append((close,hi or close,tv or 0))
+  if not rows:return {}
+  hist20=[r[2] for r in rows[1:21] if r[2]>0]
+  highs=[r[1] for r in rows]
+  return {"high":rows[0][1],"avg20_turnover":sum(hist20)/len(hist20) if hist20 else 0,
+          "high52":max(highs[:250]) if highs else 0,"high_all":max(highs) if highs else 0}
+ except:return {}
 def send(msg):
  if not TOKEN:raise RuntimeError("TELEGRAM_BOT_TOKEN missing")
  while msg:
@@ -96,6 +123,20 @@ def main():
   if any(len(codes&u)/max(1,len(codes|u))>.55 for u in used):continue
   leaders.append(r);used.append(codes)
   if len(leaders)==5:break
+ # Enrich relevant names with 20-day turnover and breakout flags.
+ enrich_codes={x["code"] for x in sorted(stocks,key=lambda z:(z["pct"],z["turnover"]),reverse=True)[:120]}
+ for r in leaders:
+  enrich_codes.update(x["code"] for x in r[5])
+ enrich={}
+ for code in list(enrich_codes):
+  enrich[code]=daily_info(code)
+ for x in stocks:
+  e=enrich.get(x["code"],{})
+  avg=e.get("avg20_turnover",0)
+  x["turnover_ratio"]=x["turnover"]/avg if avg else None
+  x["surge"]=bool(x["turnover_ratio"] and x["turnover_ratio"]>=2.0)
+  x["high52"]=bool(e.get("high52") and x["close"]>=e["high52"]*0.995)
+  x["ath"]=bool(e.get("high_all") and x["close"]>=e["high_all"]*0.995)
  big=sorted([x for x in stocks if x["turnover"]>=MIN and x["pct"]>=2],key=lambda x:x["pct"],reverse=True)
  try:hist=json.loads(HIST.read_text(encoding="utf-8"))
  except:hist={}
@@ -104,7 +145,7 @@ def main():
   for old in hist[prev[-1]]:
    cur=by.get(old["code"])
    if cur and old["close"]:
-    hi=high(old["code"]); cp=(cur["close"]/old["close"]-1)*100; hp=(hi/old["close"]-1)*100 if hi else cp; d1.append((hp,cp,cur,old))
+    hi=daily_info(old["code"]).get("high"); cp=(cur["close"]/old["close"]-1)*100; hp=(hi/old["close"]-1)*100 if hi else cp; d1.append((hp,cp,cur,old))
   d1.sort(reverse=True)
  hist[today]=[{"code":x["code"],"name":x["name"],"close":x["close"],"turnover":round(x["turnover"]),"pct":x["pct"]} for x in big]
  for k in sorted(hist)[:-45]:hist.pop(k,None)
@@ -115,10 +156,33 @@ def main():
  L=[f"📌 {NOW:%m/%d} 14:30 주도 섹터/테마 현황","",f"코스피 {ix(kp,kpp)}, 코스닥 {ix(kd,kdp)}","※ 14:30 전후 현재가 기준. 거래대금은 현재가×누적거래량 추정치.",""]
  for i,r in enumerate(leaders):
   _,name,pos,total,avg,top=r;L += [f"✅ {i+1}위 {name}",f"상승 {pos}/{total} · 평균 {avg:+.2f}%"]
-  for x in top:L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}"+(" / 거래대금 2,000억 돌파" if x["turnover"]>=MIN else ""))
+  for x in top:
+   flags=[]
+   if x["turnover"]>=MIN:flags.append("2,000억 돌파")
+   if x.get("surge"):flags.append(f"20일比 {x['turnover_ratio']:.1f}배")
+   if x.get("ath"):flags.append("역사적 신고가")
+   elif x.get("high52"):flags.append("52주 신고가")
+   L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}"+((" / "+" / ".join(flags)) if flags else ""))
   L.append("")
  L+=["🔥 거래대금 2,000억 돌파 (+2% 이상)"]
- L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']}" for x in big[:20]] or ["해당 종목 없음"];L.append("")
+ if big:
+  for x in big[:30]:
+   flags=["2,000억 돌파"]
+   if x.get("surge"):flags.append(f"20일比 {x['turnover_ratio']:.1f}배")
+   if x.get("ath"):flags.append("역사적 신고가")
+   elif x.get("high52"):flags.append("52주 신고가")
+   L.append(f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+" / ".join(flags))
+ else:L.append("해당 종목 없음")
+ L.append("")
+ surge=sorted([x for x in stocks if x.get("surge") and x["pct"]>0],key=lambda x:x.get("turnover_ratio") or 0,reverse=True)
+ L+=["🚀 20일 평균 대비 거래대금 폭증"]
+ L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / {x['turnover_ratio']:.1f}배" for x in surge[:20]] or ["해당 종목 없음"]
+ L.append("")
+ br=[x for x in stocks if x.get("ath") or x.get("high52")]
+ br.sort(key=lambda x:x["pct"],reverse=True)
+ L+=["🏁 52주·역사적 신고가"]
+ L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+("역사적 신고가" if x.get("ath") else "52주 신고가") for x in br[:20]] or ["해당 종목 없음"]
+ L.append("")
  L.append("📊 전일 2,000억 돌파 종목 D+1 성과")
  if d1:
   for hp,cp,cur,old in d1[:20]:L.append(f"[장중최고 {hp:+.2f}% / 현재 {cp:+.2f}%] {cur['name']} (전일 {money(old['turnover'])})")
