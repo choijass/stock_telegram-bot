@@ -15,21 +15,32 @@ def n(v):
  except:return None
 def market(sosok):
  out=[]
- for page in range(1,45):
-  url=f"{BASE}/sise/sise_market_sum.naver?sosok={sosok}&page={page}"
+ # Naver's legacy HTML can return an empty body to GitHub-hosted runners.
+ # Use the mobile JSON endpoint first; it is stable on Actions.
+ page=1
+ while page<=60:
+  url=f"https://m.stock.naver.com/api/stocks/marketValue/{'KOSPI' if sosok==0 else 'KOSDAQ'}?page={page}&pageSize=50"
   resp=requests.get(url,headers=H,timeout=15)
   resp.raise_for_status()
-  resp.encoding="euc-kr"
-  soup=BeautifulSoup(resp.text,"html.parser"); found=0
-  for tr in soup.select("table.type_2 tr"):
-   a=tr.select_one("a.tltle")
-   if not a:continue
-   found+=1; m=re.search(r"code=(\d+)",a.get("href","")); td=[x.get_text(" ",strip=True) for x in tr.find_all("td")]
-   if not m or len(td)<10:continue
-   close,pct,vol=n(td[1]),n(td[3]),n(td[8])
-   if None in (close,pct,vol):continue
-   out.append({"code":m.group(1),"name":a.get_text(strip=True),"close":close,"pct":pct,"volume":vol,"turnover":close*vol})
-  if not found:break
+  data=resp.json()
+  items=data.get("stocks") or data.get("items") or []
+  if not items: break
+  for x in items:
+   code=str(x.get("itemCode") or x.get("stockCode") or "")
+   name=x.get("stockName") or x.get("itemName") or ""
+   close=n(x.get("closePrice") or x.get("nowVal") or x.get("currentPrice"))
+   pct=n(x.get("fluctuationsRatio") or x.get("changeRate") or x.get("rate"))
+   vol=n(x.get("accumulatedTradingVolume") or x.get("accumulatedTradingVolumeValue") or x.get("volume"))
+   turnover=n(x.get("accumulatedTradingValue") or x.get("tradingValue"))
+   if not code or close is None or pct is None: continue
+   if turnover is not None:
+    # API trading value is commonly reported in million KRW.
+    if turnover < 1e9: turnover*=1_000_000
+   elif vol is not None: turnover=close*vol
+   else: continue
+   out.append({"code":code,"name":name,"close":close,"pct":pct,"volume":vol or 0,"turnover":turnover})
+  if len(items)<50: break
+  page+=1
  return out
 def themes():
  out=[]
