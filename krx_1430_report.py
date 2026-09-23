@@ -265,7 +265,7 @@ def main():
  L+=["","거래대금 폭증 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / {x['turnover_ratio']:.1f}배" for x in surge[:20]] or ["해당 종목 없음"]
  L.append("")
- br=[x for x in common if x.get("ath") or x.get("high52")]
+ br=[x for x in common if common_stock(x) and (x.get("ath") or x.get("high52"))]
  br.sort(key=lambda x:x["pct"],reverse=True)
  L+=["","신고가 상세"]
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / "+("역사적 신고가" if x.get("ath") else "52주 신고가") for x in br[:20]] or ["해당 종목 없음"]
