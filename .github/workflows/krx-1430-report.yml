@@ -2,9 +2,12 @@ name: KRX 14:00 + 15:30 Market Reports
 on:
   workflow_dispatch:
   schedule:
-    # 14:00 KST = 05:00 UTC; 15:30 KST = 06:30 UTC
-    - cron: "0 5 * * 1-5"
-    - cron: "30 6 * * 1-5"
+    # Start 5 minutes early to avoid GitHub's top-of-hour schedule congestion,
+    # then wait until the exact KST report time inside the job.
+    - cron: "55 13 * * 1-5"
+      timezone: "Asia/Seoul"
+    - cron: "25 15 * * 1-5"
+      timezone: "Asia/Seoul"
 permissions:
   contents: write
 concurrency:
@@ -27,13 +30,34 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: "@sang_red"
+        env:
+          SCHEDULE_EXPR: ${{ github.event.schedule }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          HOUR=$(TZ=Asia/Seoul date +%H%M)
-          if [ "$HOUR" -lt "1500" ]; then
-            REPORT_MODE=1400 python krx_1430_report.py
+          if [ "$EVENT_NAME" = "schedule" ] && [ "$SCHEDULE_EXPR" = "55 13 * * 1-5" ]; then
+            MODE=1400
+            TARGET=1400
+          elif [ "$EVENT_NAME" = "schedule" ] && [ "$SCHEDULE_EXPR" = "25 15 * * 1-5" ]; then
+            MODE=1530
+            TARGET=1530
           else
-            REPORT_MODE=1530 python krx_1430_report.py
+            # Manual Run workflow: choose the nearest logical report mode by KST.
+            NOW_HM=$(TZ=Asia/Seoul date +%H%M)
+            if [ "$NOW_HM" -lt "1500" ]; then MODE=1400; TARGET=0000; else MODE=1530; TARGET=0000; fi
           fi
+          if [ "$TARGET" != "0000" ]; then
+            python - <<'PY'
+          import os,time
+          from datetime import datetime,timedelta,timezone
+          kst=timezone(timedelta(hours=9))
+          now=datetime.now(kst)
+          target_h,target_m=(14,0) if os.environ["SCHEDULE_EXPR"].startswith("55 13") else (15,30)
+          target=now.replace(hour=target_h,minute=target_m,second=0,microsecond=0)
+          sec=(target-now).total_seconds()
+          if sec>0: time.sleep(sec)
+          PY
+          fi
+          REPORT_MODE=$MODE python krx_1430_report.py
       - name: Persist D+1 history
         run: |
           git config user.name "github-actions[bot]"
@@ -45,5 +69,5 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: krx-1430-report
-          path: results/krx_1430_*.txt
+          name: krx-market-report
+          path: results/krx_*.txt
