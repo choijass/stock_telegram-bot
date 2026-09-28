@@ -2,10 +2,6 @@ name: US Korea Market Reports
 
 on:
   workflow_dispatch:
-  schedule:
-    # 06:50 KST after each US trading session (Tuesday-Saturday KST).
-    # GitHub cron uses UTC: 21:50 Monday-Friday.
-    - cron: "50 21 * * 1-5"
 
 permissions:
   contents: read
