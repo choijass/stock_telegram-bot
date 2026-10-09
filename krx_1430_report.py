@@ -118,12 +118,8 @@ def daily_info(code):
  return {}
 def send(msg):
  if not TOKEN:raise RuntimeError("TELEGRAM_BOT_TOKEN missing")
- while msg:
-  cut=min(3900,len(msg))
-  if len(msg)>3900:
-   q=msg.rfind("\n",0,3900); cut=q if q>1000 else 3900
-  part,msg=msg[:cut],msg[cut:].lstrip()
-  r=requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",json={"chat_id":CHAT,"text":part,"disable_web_page_preview":True},timeout=20);r.raise_for_status()
+ from scripts.krx_delivery import send_report
+ send_report(msg,TOKEN,CHAT,MODE)
 def money(x):return f"{x/1e8:,.0f}억"
 def main():
  stocks=market(0)+market(1)
@@ -217,7 +213,7 @@ def main():
   if v is None: return "데이터 확인중"
   return f"{(p or 0):+.2f}%·{v:,.2f}"
  up=sum(x["pct"]>0 for x in stocks); down=sum(x["pct"]<0 for x in stocks)
- L=[f"🇰🇷 [국내장] 실시간 지표 정리 — "+("14:00 장중판" if MODE=="1400" else "15:30 장마감 확장판"),f"{NOW:%Y-%m-%d} / "+("14:00 현재 기준" if MODE=="1400" else "15:30 정규장 마감 기준"),"",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
+ L=[f"🇰🇷 [국내장] 실시간 지표 정리 — "+("14:00 장중판" if MODE=="1400" else "15:30 장마감 확장판"),f"수집 시작 {NOW:%Y-%m-%d %H:%M:%S KST} / 예정 "+("14:00" if MODE=="1400" else "15:30"),"",f"KOSPI {ix(kp,kpp)} / KOSDAQ {ix(kd,kdp)}",f"시장 폭: 상승 {up}개 / 하락 {down}개",f"시장 색깔: "+("상승 확산형" if up>down*1.2 else "하락 우위·선택적 장세" if down>up*1.2 else "혼조·순환매"),"", "① 20영업일 최고거래대금 돌파"]
  t20=sorted([x for x in common if x.get("turnover20_break")],key=lambda x:x["turnover"],reverse=True)
  L += [f"[{x['pct']:+.2f}%/ {money(x['turnover'])}] {x['name']} / 20일 최고 거래대금" for x in t20[:20]] or ["신규 돌파 없음"]
  aths=sorted([x for x in common if common_stock(x) and x.get("ath")],key=lambda x:x["turnover"],reverse=True)

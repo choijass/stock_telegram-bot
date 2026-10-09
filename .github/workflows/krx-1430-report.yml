@@ -2,6 +2,15 @@ name: KRX 14:00 + 15:30 Market Reports
 
 on:
   workflow_dispatch:
+    inputs:
+      report_mode:
+        type: choice
+        options: ['1400', '1530']
+        required: true
+      report_date:
+        description: 'KST date YYYY-MM-DD (blank = today)'
+        type: string
+        required: false
   schedule:
     # GitHub cron is UTC. KST = UTC+9.
     # 14:00 KST = 05:00 UTC / 15:30 KST = 06:30 UTC
@@ -29,7 +38,7 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - run: python -m pip install -r requirements.txt
+      - run: python -m pip install requests pandas beautifulsoup4
 
       - name: Run scheduled market report
         env:
@@ -37,17 +46,10 @@ jobs:
           TELEGRAM_CHAT_ID: "@sang_red"
           SCHEDULE_EXPR: ${{ github.event.schedule }}
           EVENT_NAME: ${{ github.event_name }}
-        run: |
-          if [ "$EVENT_NAME" = "schedule" ] && [ "$SCHEDULE_EXPR" = "0 5 * * 1-5" ]; then
-            MODE=1400
-          elif [ "$EVENT_NAME" = "schedule" ] && [ "$SCHEDULE_EXPR" = "30 6 * * 1-5" ]; then
-            MODE=1530
-          else
-            NOW_HM=$(TZ=Asia/Seoul date +%H%M)
-            if [ "$NOW_HM" -lt "1500" ]; then MODE=1400; else MODE=1530; fi
-          fi
-          echo "event=$EVENT_NAME schedule=$SCHEDULE_EXPR report_mode=$MODE kst=$(TZ=Asia/Seoul date '+%F %T')"
-          REPORT_MODE=$MODE python krx_1430_report.py
+          GITHUB_TOKEN: ${{ github.token }}
+          REPORT_MODE: ${{ inputs.report_mode }}
+          REPORT_DATE: ${{ inputs.report_date }}
+        run: python scripts/krx_delivery.py
 
       - name: Persist D+1 history
         run: |
@@ -56,11 +58,13 @@ jobs:
           git add data/turnover_2000_history.json
           if ! git diff --cached --quiet; then
             git commit -m "data: update turnover history"
+            git pull --rebase origin main
             git push
           fi
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: krx-market-report
-          path: results/krx_*.txt
+          path: results/
           if-no-files-found: warn

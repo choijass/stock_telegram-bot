@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import base64
 import json
 import os
 import sys
@@ -79,6 +80,28 @@ def dispatch(workflow):
 
 def main():
     schedule = event_schedule()
+    if schedule == "*/5 5,6,7 * * 1-5" or not schedule:
+        now = datetime.now(timezone(timedelta(hours=9)))
+        if now.weekday() >= 5: return 0
+        for mode in ("1400", "1530"):
+            target = now.replace(hour=int(mode[:2]), minute=int(mode[2:]), second=0, microsecond=0)
+            if not target + timedelta(minutes=5) <= now <= target + timedelta(minutes=15 if mode == "1400" else 30): continue
+            date = now.strftime("%Y-%m-%d")
+            try:
+                obj = request("GET", f"/contents/data/delivery/krx-{date}-{mode}.json?ref=main")
+                receipt = json.loads(base64.b64decode(obj["content"]))
+            except urllib.error.HTTPError as exc:
+                if exc.code != 404: raise
+                receipt = {}
+            if receipt.get("status") == "delivered":
+                print(f"[CONFIRMED] KRX {mode}"); continue
+            if any(p["status"] == "sending" for p in receipt.get("parts", [])):
+                raise RuntimeError(f"KRX {mode}: uncertain Telegram outcome; manual reconciliation required")
+            runs = request("GET", "/actions/workflows/krx-1430-report.yml/runs?per_page=30")["workflow_runs"]
+            if any(r["head_branch"] == "main" and (r["status"] in {"queued", "in_progress", "waiting", "pending"} or datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")) > now - timedelta(minutes=5)) for r in runs): continue
+            request("POST", "/actions/workflows/krx-1430-report.yml/dispatches", {"ref": "main", "inputs": {"report_mode": mode, "report_date": date}})
+            print(f"[RETRY] KRX {mode}: receipt missing")
+        return 0
     if schedule in {"15 2,4 * * 1-5", "45 5 * * 1-5"}:
         targets = DOMESTIC
     elif schedule == "10 22 * * 1-5":
