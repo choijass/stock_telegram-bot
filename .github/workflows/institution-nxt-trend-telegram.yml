@@ -1,0 +1,32 @@
+name: Institution NXT Trend Channel Delivery
+on:
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: "KST report date YYYY-MM-DD (empty = today)"
+        required: false
+        type: string
+  schedule:
+    # 18:10 KST, weekdays. GitHub schedule may be delayed.
+    - cron: "10 9 * * 1-5"
+permissions:
+  contents: read
+concurrency:
+  group: institution-nxt-trend-${{ github.event.inputs.report_date || github.run_id }}
+  cancel-in-progress: false
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Send existing verified report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_TREND_CHAT_ID: ${{ secrets.TELEGRAM_TREND_CHAT_ID }}
+          REPORT_DATE: ${{ inputs.report_date }}
+        run: |
+          if [ -n "$REPORT_DATE" ]; then
+            python3 scripts/send_institution_nxt_telegram.py --date "$REPORT_DATE"
+          else
+            python3 scripts/send_institution_nxt_telegram.py
+          fi
